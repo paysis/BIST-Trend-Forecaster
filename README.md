@@ -22,9 +22,6 @@ BIST 30 hisseleri için geliştirdiğimiz yapay zeka modelini canlı verilerle t
 | **Streamlit Cloud** | 🟢 Aktif | [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://bist-trend-forecaster.streamlit.app/) |
 | **Hugging Face** | 🟢 Aktif | [![Hugging Face Spaces](https://img.shields.io/badge/🤗%20Hugging%20Face-Spaces-blue)](https://huggingface.co/spaces/themuhammedguler/BIST-Trend-Forecaster) |
 
-👉 **Alternatif Link:** [https://bist-trend-forecaster.streamlit.app/](https://bist-prediction.streamlit.app/)
-
-
 ## 1. Problem Tanımı
 Finansal piyasalarda bireysel yatırımcılar genellikle teknik analiz yapmakta zorlanır ve duygusal kararlar verirler.
 *   **Problem:** Karmaşık teknik göstergelerin yorumlanmasının zorluğu ve piyasa gürültüsü içinde doğru sinyali bulamama.
