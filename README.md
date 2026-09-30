@@ -46,7 +46,7 @@ Finansal piyasalarda bireysel yatırımcılar genellikle teknik analiz yapmakta 
 
 ### Final Model: XGBoost
 *   Tabular verilerde yüksek performans gösterdiği için **XGBoost Classifier** seçildi.
-*   **Validasyon Şeması:** Finansal verilerde "geleceği görmeyi" (look-ahead bias) engellemek için klasik K-Fold yerine **`TimeSeriesSplit`** (Zaman Serisi Ayrımı) kullanıldı. İlk yıllar eğitim, son aylar test seti olarak ayrıldı.
+*   **Validasyon Şeması:** Finansal verilerde "geleceği görmeyi" (look-ahead bias) ve hisseler arası gün içi sızıntıyı engellemek için **Tarihsel Zaman Kesimi (`get_temporal_split`)** kullanıldı. Belirlenen tarihe kadarki tüm hisse verileri eğitim setine, o tarih ve sonrasındaki dönem ise test setine ayrıldı.
 
 ### Hiperparametre Optimizasyonu: Optuna
 *   `src/tune.py`, XGBoost hiperparametrelerini **Optuna** (TPE sampler + MedianPruner) ile arar. Her deneme, tarihe göre ileri doğru (walk-forward) zaman serisi CV'si ile değerlendirilir; aynı günün satırları hep aynı katta kalır.
@@ -59,7 +59,9 @@ Finansal piyasalarda bireysel yatırımcılar genellikle teknik analiz yapmakta 
     ```
 
 ### Testler
+Geliştirme ve test bağımlılıklarını kurup testleri çalıştırabilirsiniz:
 ```bash
+pip install -r requirements-dev.txt
 pytest -q
 ```
 
@@ -86,5 +88,7 @@ BIST-TREND-FORECASTER/
 │   └── model_train.py  # Eğitim scripti
 ├── tests/              # Birim ve entegrasyon testleri
 ├── app.py              # Streamlit arayüz kodu
-├── requirements.txt    # Kütüphane bağımlılıkları
+├── requirements.txt    # Kütüphane bağımlılıkları (prod)
+├── requirements-dev.txt# Geliştirme ve test bağımlılıkları
 └── README.md           # Proje dokümantasyonu
+```
