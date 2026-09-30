@@ -6,10 +6,12 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, classification_report
 import config
 import features
+import tune as tune_module
 import joblib
 import os
+import argparse
 
-def train_model():
+def train_model(tune=False, n_trials=50):
     # 1. Veriyi Yükle
     print("Veri yükleniyor...")
     df = pd.read_csv(config.DATA_PATH)
@@ -35,15 +37,17 @@ def train_model():
     print(f"Eğitim Verisi: {X_train.shape}, Test Verisi: {X_test.shape}")
     
     # 4. Model Tanımlama ve Eğitim (XGBoost)
-    # PDF'teki 'Model Optimization' burada manuel parametrelerle simüle edildi
-    model = xgb.XGBClassifier(
-        n_estimators=100,
-        learning_rate=0.05,
-        max_depth=5,
-        objective='binary:logistic',
-        random_state=42,
-        n_jobs=-1
-    )
+    # Varsayılan: manuel parametreler. --tune ile Optuna optimizasyonu yapılır.
+    params = dict(tune_module.DEFAULT_PARAMS)
+    if tune:
+        print(f"Optuna ile hiperparametre optimizasyonu ({n_trials} deneme)...")
+        dates_train = df_processed['Date'].iloc[:split_point]
+        study = tune_module.run_study(X_train, y_train, dates_train, n_trials=n_trials)
+        print(f"En iyi CV doğruluğu: {study.best_value:.4f}")
+        print(f"En iyi parametreler: {study.best_params}")
+        params = study.best_params
+
+    model = xgb.XGBClassifier(**params, **tune_module.FIXED_PARAMS)
     
     print("Model eğitiliyor...")
     model.fit(X_train, y_train)
@@ -67,6 +71,11 @@ def train_model():
         
     model.save_model(config.MODEL_PATH)
     print(f"\n✅ Model kaydedildi: {config.MODEL_PATH}")
+    return model, acc
 
 if __name__ == "__main__":
-    train_model()
+    parser = argparse.ArgumentParser(description="BIST XGBoost model eğitimi")
+    parser.add_argument("--tune", action="store_true", help="Optuna ile hiperparametre optimizasyonu yap")
+    parser.add_argument("--n-trials", type=int, default=50, help="Optuna deneme sayısı")
+    args = parser.parse_args()
+    train_model(tune=args.tune, n_trials=args.n_trials)

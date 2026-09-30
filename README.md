@@ -48,6 +48,21 @@ Finansal piyasalarda bireysel yatırımcılar genellikle teknik analiz yapmakta 
 *   Tabular verilerde yüksek performans gösterdiği için **XGBoost Classifier** seçildi.
 *   **Validasyon Şeması:** Finansal verilerde "geleceği görmeyi" (look-ahead bias) engellemek için klasik K-Fold yerine **`TimeSeriesSplit`** (Zaman Serisi Ayrımı) kullanıldı. İlk yıllar eğitim, son aylar test seti olarak ayrıldı.
 
+### Hiperparametre Optimizasyonu: Optuna
+*   `src/tune.py`, XGBoost hiperparametrelerini **Optuna** (TPE sampler + MedianPruner) ile arar. Her deneme, tarihe göre ileri doğru (walk-forward) zaman serisi CV'si ile değerlendirilir; aynı günün satırları hep aynı katta kalır.
+*   İlk deneme mevcut manuel parametrelerle (`n_estimators=100, learning_rate=0.05, max_depth=5`) başlar.
+*   Kullanım (varsayılan eğitim davranışı değişmez):
+    ```bash
+    cd src
+    python model_train.py                        # manuel parametreler
+    python model_train.py --tune --n-trials 50   # Optuna ile optimizasyon
+    ```
+
+### Testler
+```bash
+pytest -q
+```
+
 ### Model Performansı
 *   **Doğruluk (Accuracy):** %55 - %60 bandında.
     *   *Yorum:* Finansal piyasaların stokastik yapısı göz önüne alındığında, %50 üzerindeki her oran istatistiksel bir avantaj (edge) sağlar.
@@ -67,7 +82,9 @@ BIST-TREND-FORECASTER/
 ├── src/                # Kaynak kodlar
 │   ├── config.py       # Ayarlar
 │   ├── features.py     # İndikatör hesaplamaları
+│   ├── tune.py         # Optuna hiperparametre optimizasyonu
 │   └── model_train.py  # Eğitim scripti
+├── tests/              # Birim ve entegrasyon testleri
 ├── app.py              # Streamlit arayüz kodu
 ├── requirements.txt    # Kütüphane bağımlılıkları
 └── README.md           # Proje dokümantasyonu
