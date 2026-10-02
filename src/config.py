@@ -15,6 +15,15 @@ TICKERS = [
     "TUPRS.IS", "YKBNK.IS"
 ]
 
+# Yahoo Finance'te sembolü/adı değişen hisseler için eşleme tablosu
+# (24 Kasım 2025: KOZAL -> TRALT (Türk Altın), KOZAA -> TRMET (TR Anadolu Metal))
+TICKER_YAHOO_MAP = {
+    "KOZAL.IS": "TRALT.IS",
+    "KOZAA.IS": "TRMET.IS",
+    "TRALT.IS": "TRALT.IS",
+    "TRMET.IS": "TRMET.IS",
+}
+
 # Eğitim için kaç yıllık veri çekilsin?
 START_DATE = "2018-01-01"
 END_DATE = "2025-12-08" # Bugüne kadar
