@@ -3,10 +3,17 @@ import pandas as pd # type: ignore
 import numpy as np # type: ignore
 import ta # type: ignore # Technical Analysis Library
 
-def add_features(df):
+def add_features(df, drop_incomplete_target=True):
     """
     Verilen DataFrame'e teknik analiz indikatörleri ve zaman özellikleri ekler.
     PDF Gereksinimi: En az 10 feature.
+
+    drop_incomplete_target=True (eğitim): next_close/target hesaplanamayan
+    (henüz bir sonraki günü bilinmeyen) en son gün her hisse için düşürülür.
+
+    drop_incomplete_target=False (canlı tahmin): o son gün tutulur; 'target'
+    sütunu bu satırlar için anlamsızdır ve kullanılmamalıdır, çünkü gerçek
+    hedef henüz bilinmemektedir.
     """
     df = df.copy()
     
@@ -51,9 +58,15 @@ def add_features(df):
     # --- KRİTİK DÜZELTME ---
     # 1. Sonsuz değerleri (inf, -inf) NaN (boş) değere çevir
     df.replace([np.inf, -np.inf], np.nan, inplace=True)
-    
+
     # 2. NaN olan satırları sil (İndikatörlerin hesaplanamadığı ilk günler veya hatalı veriler)
-    df.dropna(inplace=True)
+    # next_close/target, bir sonraki günü olmayan (henüz bilinmeyen) en son satırlar
+    # için her zaman NaN/anlamsızdır; drop_incomplete_target=False ile canlı tahmin
+    # senaryosunda bu satırlar sadece bu yüzden atılmaz.
+    always_required = [c for c in df.columns if c not in ('next_close', 'target')]
+    df.dropna(subset=always_required, inplace=True)
+    if drop_incomplete_target:
+        df.dropna(subset=['next_close'], inplace=True)
     # -----------------------
-    
+
     return df

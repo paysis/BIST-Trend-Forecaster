@@ -55,8 +55,10 @@ def get_prediction_data(ticker):
     df.rename(columns=new_columns, inplace=True)
     
     # Feature Engineering Scriptini Kullan
-    df_processed = features.add_features(df)
-    
+    # drop_incomplete_target=False: canlı tahminde bugünün hedefi (yarının kapanışı)
+    # henüz bilinmez; bu normalde eğitimde düşürülen son günü burada tutar.
+    df_processed = features.add_features(df, drop_incomplete_target=False)
+
     # Sadece en son günü al (Yarın için tahmin yapacağız)
     last_row = df_processed.iloc[[-1]]
     return last_row, df # df grafik çizimi için lazım
@@ -126,7 +128,7 @@ try:
                             low=full_df['low'][-90:],
                             close=full_df['close'][-90:])])
             fig.update_layout(xaxis_rangeslider_visible=False)
-            st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch')
             
             # Explainability (PDF Şartı: Neden bu karar?)
             st.subheader("Model Neden Bu Kararı Verdi?")
