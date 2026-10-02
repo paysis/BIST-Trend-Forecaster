@@ -10,8 +10,9 @@ def fetch_data():
     
     for ticker in config.TICKERS:
         try:
-            # Veriyi çek
-            df = yf.download(ticker, start=config.START_DATE, end=config.END_DATE, progress=False)
+            # Veriyi çek (Yahoo Finance sembol değişikliği varsa eşle)
+            yahoo_ticker = getattr(config, "TICKER_YAHOO_MAP", {}).get(ticker, ticker)
+            df = yf.download(yahoo_ticker, start=config.START_DATE, end=config.END_DATE, progress=False)
             
             # Multi-index düzeltmesi (yfinance yeni versiyonları için)
             if isinstance(df.columns, pd.MultiIndex):

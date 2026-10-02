@@ -19,7 +19,11 @@ bir sonraki günkü kapanış yönünü (Artış/Düşüş) tahmin eder.
 
 # Yan Menü
 st.sidebar.header("Hisse Seçimi")
-selected_ticker = st.sidebar.selectbox("Hisse Senedi Seçiniz", [t.replace(".IS","") for t in config.TICKERS])
+selected_ticker = st.sidebar.selectbox(
+    "Hisse Senedi Seçiniz",
+    [t.replace(".IS", "") for t in config.TICKERS],
+    format_func=lambda x: f"{x} (TRALT)" if x == "KOZAL" else (f"{x} (TRMET)" if x == "KOZAA" else x)
+)
 selected_ticker_full = selected_ticker + ".IS"
 
 # Model Yükleme
@@ -31,8 +35,17 @@ def load_model():
 
 # Canlı Veri Çekme ve İşleme Fonksiyonu
 def get_prediction_data(ticker):
+    # Yahoo Finance sembolü değişen hisseleri eşle (Örn: KOZAL -> TRALT)
+    yahoo_ticker = getattr(config, "TICKER_YAHOO_MAP", {}).get(ticker, ticker)
+    
     # Modelin indikatörleri hesaplayabilmesi için son 6 ayın verisine ihtiyacı var
-    df = yf.download(ticker, period="6mo", progress=False)
+    df = yf.download(yahoo_ticker, period="6mo", progress=False)
+    
+    if df is None or df.empty or len(df) == 0:
+        raise ValueError(
+            f"'{ticker}' (Yahoo: '{yahoo_ticker}') için piyasa verisi alınamadı. "
+            "Sembol değişmiş veya Yahoo Finance servisi yanıt vermiyor olabilir."
+        )
     
     if isinstance(df.columns, pd.MultiIndex):
         df.columns = df.columns.get_level_values(0)
@@ -45,19 +58,25 @@ def get_prediction_data(ticker):
     # Sütun isimlerini düzenle (features.py 'Date' ve küçük harfli sütunlar bekliyor)
     new_columns = {}
     for col in df.columns:
-        if col.lower() == 'date':
+        if col.lower() in ('date', 'index'):
             new_columns[col] = 'Date' # Date büyük kalsın
-        elif col == 'ticker':
+        elif col.lower() == 'ticker':
             new_columns[col] = 'ticker' # ticker küçük kalsın
         else:
             new_columns[col] = col.lower() # open, close, high, low vs. küçük olsun
             
     df.rename(columns=new_columns, inplace=True)
     
+    if 'Date' not in df.columns:
+        raise ValueError(f"'{ticker}' için çekilen veride 'Date' sütunu bulunamadı.")
+    
     # Feature Engineering Scriptini Kullan
     # drop_incomplete_target=False: canlı tahminde bugünün hedefi (yarının kapanışı)
     # henüz bilinmez; bu normalde eğitimde düşürülen son günü burada tutar.
     df_processed = features.add_features(df, drop_incomplete_target=False)
+    
+    if df_processed.empty:
+        raise ValueError(f"'{ticker}' verisi teknik indikatörler hesaplandıktan sonra yetersiz kaldı.")
 
     # Sadece en son günü al (Yarın için tahmin yapacağız)
     last_row = df_processed.iloc[[-1]]
@@ -140,5 +159,7 @@ try:
             elif input_data['rsi'].values[0] > 70:
                 st.markdown("- **RSI** aşırı alım bölgesinde (70 üstü), düzeltme gelebilir.")
 
+except ValueError as e:
+    st.warning(f"⚠️ {e}")
 except Exception as e:
     st.error(f"Bir hata oluştu: {e}")
