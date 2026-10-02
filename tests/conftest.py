@@ -6,8 +6,11 @@ import numpy as np
 import pandas as pd
 import pytest
 
-# src/ içindeki modüller birbirini "import config" şeklinde içe aktarıyor
-SRC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "src")
+# Proje kök dizini ve src/ dizinini sys.path'e ekle
+ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+SRC_DIR = os.path.join(ROOT_DIR, "src")
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
