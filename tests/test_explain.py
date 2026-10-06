@@ -1,9 +1,10 @@
 # tests/test_explain.py - TreeSHAP tabanlı yerel açıklanabilirlik testleri
 import numpy as np
+import pandas as pd
 import pytest
 import xgboost as xgb
 
-from explain import explain_prediction
+from explain import FEATURE_LABELS, explain_prediction, summarize_drivers, top_drivers
 
 
 @pytest.fixture
@@ -81,3 +82,64 @@ def test_rejects_multiple_rows(trained_model):
     model, X = trained_model
     with pytest.raises(ValueError):
         explain_prediction(model, X.iloc[:2])
+
+
+def _explanation(impacts):
+    """Verilen etkilerden (feature -> impact) explain_prediction çıktısı biçiminde tablo üretir."""
+    df = pd.DataFrame({
+        "feature": list(impacts),
+        "value": 0.0,
+        "contribution": list(impacts.values()),
+        "impact": list(impacts.values()),
+    })
+    order = df["contribution"].abs().sort_values(ascending=False).index
+    return df.loc[order].reset_index(drop=True)
+
+
+def test_top_drivers_splits_by_direction_and_ranks_by_impact():
+    explanation = _explanation({
+        "macd": 0.072, "vol_change": 0.041, "rsi": 0.010, "month": 0.002,
+        "volatility": -0.030, "lag_1_ret": -0.005,
+    })
+
+    up, down = top_drivers(explanation, n=3)
+
+    assert up["feature"].tolist() == ["macd", "vol_change", "rsi"]
+    assert down["feature"].tolist() == ["volatility", "lag_1_ret"]
+
+
+def test_top_drivers_ignores_zero_impact():
+    up, down = top_drivers(_explanation({"rsi": 0.0, "macd": 0.01}), n=3)
+
+    assert up["feature"].tolist() == ["macd"]
+    assert down.empty
+
+
+def test_every_model_feature_has_a_readable_label():
+    model_features = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width', 'volatility',
+                      'lag_1_ret', 'lag_2_ret', 'vol_change', 'day_of_week', 'month']
+    assert set(model_features) <= set(FEATURE_LABELS)
+
+
+def test_summary_names_upward_and_downward_drivers_with_percent_impact():
+    explanation = _explanation({"macd": 0.072, "vol_change": 0.041, "volatility": -0.030})
+
+    summary = summarize_drivers(explanation, "THYAO")
+
+    assert summary == (
+        "THYAO tahminini yukarı taşıyan ana faktörler: "
+        f"{FEATURE_LABELS['macd']} (+%7.2), {FEATURE_LABELS['vol_change']} (+%4.1); "
+        f"aşağı çeken: {FEATURE_LABELS['volatility']} (-%3.0)."
+    )
+
+
+def test_summary_handles_one_sided_explanations():
+    summary = summarize_drivers(_explanation({"rsi": -0.02}), "AKBNK")
+
+    assert "yukarı taşıyan belirgin bir faktör yok" in summary
+    assert f"{FEATURE_LABELS['rsi']} (-%2.0)" in summary
+
+
+def test_unknown_feature_falls_back_to_its_name():
+    summary = summarize_drivers(_explanation({"f0": 0.05}), "X")
+    assert "f0 (+%5.0)" in summary
