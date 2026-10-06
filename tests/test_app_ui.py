@@ -106,3 +106,26 @@ def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     assert "Hisse" in leaderboard.columns
     assert "Yükseliş Olasılığı (%)" in leaderboard.columns
     assert len(leaderboard) > 0
+
+
+def test_cached_data_does_not_leak_between_tests_first(monkeypatch):
+    """Aynı hisse için bir önceki testin önbelleğe aldığı veri, sonraki testte
+    farklı bir veri ile yamalanan yf.download'ı gölgelememeli (bkz. _second)."""
+    panel = _fake_download_panel()
+    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert at.metric[0].value == f"{panel[('Close', 'AKBNK.IS')].iloc[-1]:.2f} TL"
+
+
+def test_cached_data_does_not_leak_between_tests_second(monkeypatch):
+    panel = _fake_download_panel()
+    panel.iloc[:, :4] *= 3  # Fiyatlar 3 katı
+    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert at.metric[0].value == f"{panel[('Close', 'AKBNK.IS')].iloc[-1]:.2f} TL"

@@ -15,8 +15,16 @@ if SRC_DIR not in sys.path:
     sys.path.insert(0, SRC_DIR)
 
 import optuna  # noqa: E402
+import streamlit as st  # noqa: E402
 
 optuna.logging.set_verbosity(optuna.logging.WARNING)
+
+
+@pytest.fixture(autouse=True)
+def clear_streamlit_cache():
+    """@st.cache_data süreç genelinde kalıcıdır; testler arasında sızmasını önler."""
+    st.cache_data.clear()
+    yield
 
 
 @pytest.fixture
