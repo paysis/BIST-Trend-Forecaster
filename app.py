@@ -26,6 +26,17 @@ selected_ticker = st.sidebar.selectbox(
 )
 selected_ticker_full = selected_ticker + ".IS"
 
+st.sidebar.header("Sinyal Ayarları")
+min_confidence = st.sidebar.slider(
+    "Minimum Güven Eşiği",
+    min_value=0.51,
+    max_value=0.70,
+    value=config.PROB_THRESHOLD_HIGH,
+    step=0.01,
+    help="Olasılık bu eşiğin üzerinde (ya da 1 - eşik altında) değilse sinyal nötr gösterilir.",
+)
+prob_low, prob_high = signals.symmetric_band(min_confidence)
+
 # Model Yükleme
 @st.cache_resource
 def load_model():
@@ -102,9 +113,7 @@ try:
             
             # Tahmin
             prob = model.predict_proba(X_pred)[0][1] # Artış olasılığı
-            signal = signals.classify_signal(
-                prob, config.PROB_THRESHOLD_LOW, config.PROB_THRESHOLD_HIGH
-            )
+            signal = signals.classify_signal(prob, prob_low, prob_high)
             # Sinyale göre renkli kutu: yeşil (yükseliş), sarı (nötr), kırmızı (düşüş)
             signal_box, signal_label = {
                 signals.UP: (st.success, "**YÜKSELİŞ BEKLENTİSİ** 🚀"),

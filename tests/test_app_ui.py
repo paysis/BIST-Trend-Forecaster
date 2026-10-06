@@ -141,3 +141,20 @@ def test_coin_flip_probabilities_render_as_neutral(patched_download, fixed_proba
     assert any("NÖTR" in e.value for e in at.warning)
     assert not any("YÜKSELİŞ" in e.value for e in at.success)
     assert not any("DÜŞÜŞ" in e.value for e in at.error)
+
+
+def test_min_confidence_slider_widens_neutral_band(patched_download, fixed_probability):
+    fixed_probability(0.56)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    slider = at.sidebar.slider[0]
+    assert slider.value == pytest.approx(0.53)
+    assert any("YÜKSELİŞ" in e.value for e in at.success)
+
+    slider.set_value(0.60).run()
+
+    assert list(at.exception) == []
+    assert any("NÖTR" in e.value for e in at.warning)
+    assert not at.success
