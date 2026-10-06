@@ -129,3 +129,19 @@ def test_cached_data_does_not_leak_between_tests_second(monkeypatch):
     at.run()
 
     assert at.metric[0].value == f"{panel[('Close', 'AKBNK.IS')].iloc[-1]:.2f} TL"
+
+
+def test_scanner_tab_stays_usable_when_selected_ticker_has_no_data(monkeypatch):
+    """Yan menüde seçili hissenin verisi alınamadığında yalnızca o sekme uyarı
+    göstermeli; Fırsat Radarı sekmesi kullanılabilir kalmalı."""
+    panel = _fake_download_panel()
+    monkeypatch.setattr(
+        yfinance, "download",
+        lambda ticker, *args, **kwargs: pd.DataFrame() if ticker == "AKBNK.IS" else panel.copy(),
+    )
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert any("piyasa verisi alınamadı" in w.value for w in at.warning)
+    assert any(b.key == "btn_start_scan" for b in at.button)
