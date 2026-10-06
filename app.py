@@ -150,8 +150,7 @@ def render_market_scanner_tab():
             )
 
         if scan_df is not None and not scan_df.empty:
-            top_bull = scan_df.head(5)
-            top_bear = scan_df.tail(5).iloc[::-1]  # En düşükten yukarıya sırala
+            top_bull, top_bear = scanner.top_and_bottom(scan_df, n=5)
 
             c1, c2 = st.columns(2)
             with c1:

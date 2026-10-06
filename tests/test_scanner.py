@@ -148,3 +148,24 @@ def test_scan_market_does_not_hide_model_errors(monkeypatch, fake_panel, error):
 
     with pytest.raises(error):
         scanner.scan_market(["AKBNK.IS"], BrokenModel())
+
+
+def _scan_frame(n):
+    probs = np.linspace(0.9, 0.1, n)
+    return pd.DataFrame({"ticker_code": [f"T{i}.IS" for i in range(n)], "_prob": probs})
+
+
+@pytest.mark.parametrize("n_rows, expected_size", [(30, 5), (10, 5), (9, 4), (3, 1), (1, 0), (0, 0)])
+def test_top_and_bottom_never_overlap(n_rows, expected_size):
+    bull, bear = scanner.top_and_bottom(_scan_frame(n_rows), n=5)
+
+    assert len(bull) == len(bear) == expected_size
+    assert not set(bull["ticker_code"]) & set(bear["ticker_code"])
+
+
+def test_top_and_bottom_order():
+    bull, bear = scanner.top_and_bottom(_scan_frame(30), n=5)
+
+    assert bull["ticker_code"].tolist() == ["T0.IS", "T1.IS", "T2.IS", "T3.IS", "T4.IS"]
+    # Düşüş listesi en düşük olasılıktan başlamalı
+    assert bear["ticker_code"].tolist() == ["T29.IS", "T28.IS", "T27.IS", "T26.IS", "T25.IS"]

@@ -108,3 +108,15 @@ def scan_market(tickers, model):
     df_scan.sort_values(by="_prob", ascending=False, inplace=True)
     df_scan.reset_index(drop=True, inplace=True)
     return df_scan, failed
+
+
+def top_and_bottom(df_scan, n=5):
+    """Olasılığa göre sıralı taramadan en yüksek ve en düşük n hisseyi döndürür.
+
+    Sonuç sayısı 2n'den azsa iki liste çakışmasın diye n küçültülür
+    (örn. 9 hisse -> 4 + 4). Düşüş listesi en düşük olasılıktan başlar.
+    """
+    n = min(n, len(df_scan) // 2)
+    if n == 0:
+        return df_scan.iloc[0:0], df_scan.iloc[0:0]
+    return df_scan.head(n), df_scan.tail(n).iloc[::-1]
