@@ -34,6 +34,25 @@ def fake_panel():
     return df
 
 
+def batch_download(make_frame, calls=None):
+    """yf.download(liste, group_by="ticker") çıktısını taklit eder: (sembol, alan)
+    MultiIndex sütunlu tek bir DataFrame. Verisi olmayan semboller, gerçek
+    Yahoo yanıtında olduğu gibi tamamen NaN bir blok olarak döner."""
+    def download(tickers, *args, **kwargs):
+        if calls is not None:
+            calls.append(tickers)
+        symbols = [tickers] if isinstance(tickers, str) else list(tickers)
+        frames = {sym: make_frame(sym) for sym in symbols}
+        index = next((f.index for f in frames.values() if not f.empty), None)
+        if index is None:
+            return pd.DataFrame()
+        cols = ["Open", "High", "Low", "Close", "Volume"]
+        frames = {sym: (f if not f.empty else pd.DataFrame(np.nan, index=index, columns=cols))
+                  for sym, f in frames.items()}
+        return pd.concat(frames, axis=1)
+    return download
+
+
 def test_predict_single_ticker_success(monkeypatch, dummy_model, fake_panel):
     monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: fake_panel.copy())
 
@@ -58,15 +77,15 @@ def test_predict_single_ticker_handles_empty_data(monkeypatch, dummy_model):
 def test_scan_market_sorts_by_probability_descending(monkeypatch, dummy_model, fake_panel):
     # Farklı fiyat şekilleri farklı RSI, dolayısıyla farklı olasılık üretir.
     # (Fiyatı sabit bir katsayıyla ölçeklemek RSI'ı değiştirmez.)
-    def custom_download(ticker, *args, **kwargs):
+    def make_frame(symbol):
         df = fake_panel.copy()
-        if "GARAN" in ticker:  # sürekli düşüş -> RSI ~ 0
+        if "GARAN" in symbol:  # sürekli düşüş -> RSI ~ 0
             df["Close"] = df["Close"].to_numpy()[::-1]
-        elif "THYAO" in ticker:  # yatay dalgalanma -> RSI ~ 50
+        elif "THYAO" in symbol:  # yatay dalgalanma -> RSI ~ 50
             df["Close"] = 100.0 + np.sin(np.arange(len(df)))
         return df
 
-    monkeypatch.setattr(yfinance, "download", custom_download)
+    monkeypatch.setattr(yfinance, "download", batch_download(make_frame))
 
     tickers = ["AKBNK.IS", "GARAN.IS", "THYAO.IS"]
     df_scan = scanner.scan_market(tickers, dummy_model)
@@ -85,15 +104,24 @@ def test_scan_market_handles_empty_list(dummy_model):
 
 
 def test_scan_market_continues_on_partial_failure(monkeypatch, dummy_model, fake_panel):
-    def flappy_download(ticker, *args, **kwargs):
-        if "FAIL" in ticker:
-            return pd.DataFrame()
-        return fake_panel.copy()
-
-    monkeypatch.setattr(yfinance, "download", flappy_download)
+    monkeypatch.setattr(yfinance, "download", batch_download(
+        lambda symbol: pd.DataFrame() if "FAIL" in symbol else fake_panel.copy()
+    ))
 
     tickers = ["AKBNK.IS", "FAIL.IS", "THYAO.IS"]
     df_scan = scanner.scan_market(tickers, dummy_model)
 
     assert len(df_scan) == 2
     assert "FAIL.IS" not in df_scan["ticker_code"].values
+
+
+def test_scan_market_downloads_all_symbols_in_one_request(monkeypatch, dummy_model, fake_panel):
+    calls = []
+    monkeypatch.setattr(yfinance, "download", batch_download(lambda symbol: fake_panel.copy(), calls))
+
+    df_scan = scanner.scan_market(["AKBNK.IS", "KOZAL.IS", "THYAO.IS"], dummy_model)
+
+    assert len(calls) == 1
+    # Yahoo'da adı değişen hisse güncel sembolüyle istenmeli
+    assert sorted(calls[0]) == ["AKBNK.IS", "THYAO.IS", "TRALT.IS"]
+    assert set(df_scan["ticker_code"]) == {"AKBNK.IS", "KOZAL.IS", "THYAO.IS"}

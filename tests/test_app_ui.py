@@ -7,6 +7,7 @@ import pytest
 import yfinance
 from streamlit.testing.v1 import AppTest
 
+import config
 import features
 
 APP_PATH = str(Path(__file__).resolve().parents[1] / "app.py")
@@ -53,8 +54,18 @@ def _expected_last_row(panel, ticker="AKBNK.IS"):
 
 @pytest.fixture
 def patched_download(monkeypatch):
+    """Tek sembol istekleri için `panel`, BIST 30 taramasının toplu isteği için
+    (sembol, alan) sütunlu bir toplu panel döndürür."""
     panel = _fake_download_panel()
-    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    def download(tickers, *args, **kwargs):
+        if isinstance(tickers, str):
+            return panel.copy()
+        single = panel.copy()
+        single.columns = single.columns.get_level_values(0)
+        return pd.concat({sym: single for sym in tickers}, axis=1)
+
+    monkeypatch.setattr(yfinance, "download", download)
     return panel
 
 
@@ -105,7 +116,7 @@ def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     leaderboard = at.dataframe[-1].value
     assert "Hisse" in leaderboard.columns
     assert "Yükseliş Olasılığı (%)" in leaderboard.columns
-    assert len(leaderboard) > 0
+    assert len(leaderboard) == len(config.TICKERS)
 
 
 def test_cached_data_does_not_leak_between_tests_first(monkeypatch):

@@ -1,6 +1,7 @@
 # src/scanner.py
 # BIST 30 hisselerinin tamamını modelden geçirip fırsat radarı sıralaması oluşturan modül
 import pandas as pd
+import yfinance as yf
 from src import live_data
 
 
@@ -13,7 +14,11 @@ def predict_single_ticker(ticker, model):
         df_processed, df = live_data.fetch_live_frame(ticker)
     except ValueError:
         return None
+    return _build_record(ticker, df_processed, df, model)
 
+
+def _build_record(ticker, df_processed, df, model):
+    """Hazırlanmış canlı veriden tahmin ve fiyat metriklerini içeren satırı üretir."""
     features_list = [
         "rsi", "macd", "sma_10", "sma_50", "bb_width",
         "volatility", "lag_1_ret", "lag_2_ret", "vol_change",
@@ -47,17 +52,39 @@ def predict_single_ticker(ticker, model):
     }
 
 
+def _symbol_frame(batch, symbol):
+    """Toplu yf.download çıktısından tek bir sembolün OHLCV verisini çıkarır.
+
+    Yahoo verisi alınamayan sembolleri tamamen NaN bir blok olarak döndürür;
+    bu satırlar atılır, sembol hiç yoksa boş DataFrame döner.
+    """
+    if batch is None or batch.empty or not isinstance(batch.columns, pd.MultiIndex):
+        return pd.DataFrame()
+    for level in range(batch.columns.nlevels):
+        if symbol in batch.columns.get_level_values(level):
+            return batch.xs(symbol, axis=1, level=level).dropna(how="all")
+    return pd.DataFrame()
+
+
 def scan_market(tickers, model):
     """
     Verilen hisse listesini tarar, modelden geçirir ve artış olasılığına göre
     azalan sırada sıralanmış bir DataFrame döndürür.
+
+    Tüm semboller tek bir toplu Yahoo Finance isteğiyle indirilir.
     """
     records = []
-    for ticker in tickers:
+    symbols = {ticker: live_data.yahoo_symbol(ticker) for ticker in tickers}
+    batch = None
+    if symbols:
+        batch = yf.download(
+            sorted(set(symbols.values())), period=live_data.LIVE_PERIOD,
+            group_by="ticker", progress=False,
+        )
+    for ticker, symbol in symbols.items():
         try:
-            res = predict_single_ticker(ticker, model)
-            if res is not None:
-                records.append(res)
+            df_processed, df = live_data.prepare_live_frame(_symbol_frame(batch, symbol), ticker)
+            records.append(_build_record(ticker, df_processed, df, model))
         except Exception:
             continue
 
