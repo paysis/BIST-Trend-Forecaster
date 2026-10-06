@@ -130,16 +130,16 @@ def render_market_scanner_tab():
 
     c_btn1, c_btn2 = st.columns([3, 7])
     with c_btn1:
-        start_scan = st.button("🚀 BIST 30 Taramasını Başlat", key="btn_start_scan")
+        if st.button("🚀 BIST 30 Taramasını Başlat", key="btn_start_scan"):
+            # Yenile butonu aynı çalıştırmada görünsün diye bayrak buton satırından önce set edilir
+            st.session_state["market_scan_done"] = True
     with c_btn2:
         if st.session_state.get("market_scan_done", False):
             if st.button("🔄 Taramayı Yenile", key="btn_refresh_scan"):
                 get_cached_market_scan.clear()
-                st.session_state["market_scan_done"] = True
                 st.rerun()
 
-    if start_scan or st.session_state.get("market_scan_done", False):
-        st.session_state["market_scan_done"] = True
+    if st.session_state.get("market_scan_done", False):
         with st.spinner("BIST 30 hisseleri taranıyor ve analiz ediliyor..."):
             scan_df, failed_tickers = get_cached_market_scan(tuple(config.TICKERS))
 

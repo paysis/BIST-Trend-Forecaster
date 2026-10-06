@@ -178,3 +178,13 @@ def test_scanner_lists_tickers_without_data(monkeypatch):
     assert list(at.exception) == []
     assert any("1 hisse için veri alınamadı" in w.value and "SASA" in w.value for w in at.warning)
     assert len(at.dataframe[-1].value) == len(config.TICKERS) - 1
+
+
+def test_refresh_button_appears_right_after_first_scan(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert not any(b.key == "btn_refresh_scan" for b in at.button)
+
+    at.button(key="btn_start_scan").click().run()
+
+    assert any(b.key == "btn_refresh_scan" for b in at.button)
