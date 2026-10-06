@@ -4,9 +4,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import xgboost
 import yfinance
 from streamlit.testing.v1 import AppTest
 
+import config
+import explain
 import features
 
 APP_PATH = str(Path(__file__).resolve().parents[1] / "app.py")
@@ -86,3 +89,40 @@ def test_app_uses_most_recent_trading_day_for_prediction(patched_download):
         expected.reset_index(drop=True),
         check_exact=False,
     )
+
+
+def _plotly_charts(at):
+    return at.get("plotly_chart")
+
+
+def test_explanation_replaces_static_rsi_rules(patched_download):
+    """Fikstürde RSI 100'dür; eski kural tabanlı metin "aşırı alım" basardı."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    texts = [m.value for m in at.markdown]
+    assert not any("aşırı alım" in t or "aşırı satım" in t for t in texts)
+    assert any("tahminini" in t for t in texts)
+
+
+def test_explanation_matches_model_contributions(patched_download):
+    """UI'daki özet, aynı satır için modelin gerçek TreeSHAP katkılarıyla tutarlı olmalı."""
+    model = xgboost.XGBClassifier()
+    model.load_model(config.MODEL_PATH)
+    row = _expected_last_row(patched_download)[model.get_booster().feature_names]
+    explanation, _ = explain.explain_prediction(model, row)
+    expected_summary = explain.summarize_drivers(explanation, "AKBNK")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert expected_summary in [m.value for m in at.markdown]
+
+
+def test_explanation_renders_contribution_waterfall(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    # Fiyat grafiği + katkı şelale grafiği
+    assert len(_plotly_charts(at)) == 2

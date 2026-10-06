@@ -5,7 +5,7 @@ import xgboost as xgb
 import yfinance as yf
 import ta
 import plotly.graph_objects as go
-from src import config, features
+from src import config, explain, features
 import os
 
 # Sayfa Ayarları
@@ -150,14 +150,37 @@ try:
             st.plotly_chart(fig, width='stretch')
             
             # Explainability (PDF Şartı: Neden bu karar?)
+            # Modelin gerçek TreeSHAP katkıları: her özniteliğin bu tahmindeki payı
             st.subheader("Model Neden Bu Kararı Verdi?")
+            explanation, base_prob = explain.explain_prediction(model, X_pred)
+            st.markdown(explain.summarize_drivers(explanation, selected_ticker))
+
+            impacts = explanation['impact'] * 100
+            levels = base_prob * 100 + impacts.cumsum()
+            fig_explain = go.Figure(go.Waterfall(
+                measure=["absolute"] + ["relative"] * len(explanation) + ["total"],
+                x=["Ortalama"] + [explain.FEATURE_LABELS.get(f, f) for f in explanation['feature']] + ["Tahmin"],
+                y=[base_prob * 100] + impacts.tolist() + [0],
+                text=[f"%{base_prob * 100:.1f}"] + [f"{i:+.1f}" for i in impacts] + [f"%{prob * 100:.1f}"],
+                increasing={"marker": {"color": "#2ca02c"}},
+                decreasing={"marker": {"color": "#d62728"}},
+            ))
+            # Başlangıç çubuğu %0'dan başlarsa birkaç puanlık katkılar okunmaz; ekseni yakınlaştır
+            low, high = min(levels.min(), base_prob * 100), max(levels.max(), base_prob * 100)
+            fig_explain.update_layout(
+                yaxis_title="Yükseliş Olasılığı (%)",
+                yaxis_range=[low - 2, high + 2],
+                showlegend=False,
+            )
+            st.plotly_chart(fig_explain, width='stretch')
+            st.caption(
+                "Ortalama: modelin hiçbir göstergeyi bilmeden verdiği olasılık. "
+                "Her çubuk, ilgili göstergenin bugünkü değerinin olasılığı kaç puan "
+                "artırdığını (yeşil) ya da azalttığını (kırmızı) gösterir."
+            )
+
             st.write("Son günün teknik verileri:")
             st.dataframe(input_data[['rsi', 'macd', 'sma_10', 'sma_50', 'volatility']])
-            
-            if input_data['rsi'].values[0] < 30:
-                st.markdown("- **RSI** aşırı satım bölgesinde (30 altı), bu genellikle tepki alımı geleceğine işaret edebilir.")
-            elif input_data['rsi'].values[0] > 70:
-                st.markdown("- **RSI** aşırı alım bölgesinde (70 üstü), düzeltme gelebilir.")
 
 except ValueError as e:
     st.warning(f"⚠️ {e}")
