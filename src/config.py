@@ -27,3 +27,8 @@ TICKER_YAHOO_MAP = {
 # Eğitim için kaç yıllık veri çekilsin?
 START_DATE = "2018-01-01"
 END_DATE = "2025-12-08" # Bugüne kadar
+
+# Yön sinyali için nötr bant: bu aralıktaki olasılıklar yazı-turadan ayırt edilemez
+# prob >= HIGH -> yükseliş, prob <= LOW -> düşüş, arası -> nötr / belirsiz
+PROB_THRESHOLD_HIGH = 0.53
+PROB_THRESHOLD_LOW = 0.47
