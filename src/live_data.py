@@ -48,6 +48,12 @@ def prepare_live_frame(raw, ticker):
     if 'Date' not in df.columns:
         raise ValueError(f"'{ticker}' için çekilen veride 'Date' sütunu bulunamadı.")
 
+    # Yahoo seans sonrası bazen günün satırını OHLC'si boş, yalnızca hacmi dolu
+    # döndürür (#25). Bu satır fiyat, grafik ve tahminin farklı günleri
+    # kullanmasına yol açtığı için atılır; hepsi son tam işlem gününü kullanır.
+    price_cols = [c for c in ('open', 'high', 'low', 'close') if c in df.columns]
+    df = df.dropna(subset=price_cols).reset_index(drop=True)
+
     # drop_incomplete_target=False: canlı tahminde bugünün hedefi (yarının kapanışı)
     # henüz bilinmez; bu normalde eğitimde düşürülen son günü burada tutar.
     df_processed = features.add_features(df, drop_incomplete_target=False)

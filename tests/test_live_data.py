@@ -60,3 +60,21 @@ def test_fetch_live_frame_downloads_mapped_symbol(monkeypatch):
 
     live_data.fetch_live_frame("KOZAA.IS")
     assert requested == ["TRMET.IS"]
+
+
+@pytest.mark.parametrize("multiindex_ticker", [None, "AKBNK.IS"])
+def test_prepare_live_frame_drops_partial_rows_without_prices(multiindex_ticker):
+    """Yahoo seans sonrası bazen günün satırını OHLC'si boş, yalnızca hacmi dolu
+    döndürür. Bu satır fiyat/grafik ve tahmin için kullanılmamalı (#25)."""
+    raw = _raw_panel()
+    partial_day = raw.index[-1] + pd.offsets.BDay(1)
+    raw.loc[partial_day] = [np.nan, np.nan, np.nan, np.nan, 125_773_102.0]
+    if multiindex_ticker:
+        raw.columns = pd.MultiIndex.from_product([raw.columns, [multiindex_ticker]], names=["Price", "Ticker"])
+
+    processed, ohlcv = live_data.prepare_live_frame(raw, "AKBNK.IS")
+
+    assert ohlcv[["open", "high", "low", "close"]].notna().all().all()
+    assert ohlcv["Date"].iloc[-1] == raw.index[-2]
+    # Fiyat metriği, grafik ve tahmin aynı son tam işlem gününü kullanmalı
+    assert processed["Date"].iloc[-1] == ohlcv["Date"].iloc[-1]
