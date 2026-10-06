@@ -72,8 +72,13 @@ def scan_market(tickers, model):
     azalan sırada sıralanmış bir DataFrame döndürür.
 
     Tüm semboller tek bir toplu Yahoo Finance isteğiyle indirilir.
+
+    Dönüş: (df_scan, failed). failed, verisi alınamayan veya indikatörler için
+    yetersiz kalan hisselerin listesidir. Veriyle ilgisi olmayan hatalar
+    (örn. model/öznitelik uyumsuzluğu) gizlenmez, çağırana iletilir.
     """
     records = []
+    failed = []
     symbols = {ticker: live_data.yahoo_symbol(ticker) for ticker in tickers}
     batch = None
     if symbols:
@@ -84,9 +89,12 @@ def scan_market(tickers, model):
     for ticker, symbol in symbols.items():
         try:
             df_processed, df = live_data.prepare_live_frame(_symbol_frame(batch, symbol), ticker)
-            records.append(_build_record(ticker, df_processed, df, model))
-        except Exception:
+        except ValueError:
+            failed.append(ticker)
             continue
+        # Model hataları (XGBoost öznitelik uyumsuzluğunda da ValueError fırlatır)
+        # veri hatası sayılmamalı; bu yüzden try bloğunun dışında.
+        records.append(_build_record(ticker, df_processed, df, model))
 
     if not records:
         return pd.DataFrame(
@@ -94,9 +102,9 @@ def scan_market(tickers, model):
                 "Hisse", "ticker_code", "Son Fiyat (TL)",
                 "Günlük Değişim (%)", "Yükseliş Olasılığı (%)", "Tahmin", "_prob"
             ]
-        )
+        ), failed
 
     df_scan = pd.DataFrame(records)
     df_scan.sort_values(by="_prob", ascending=False, inplace=True)
     df_scan.reset_index(drop=True, inplace=True)
-    return df_scan
+    return df_scan, failed

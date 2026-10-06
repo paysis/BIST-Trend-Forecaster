@@ -141,7 +141,13 @@ def render_market_scanner_tab():
     if start_scan or st.session_state.get("market_scan_done", False):
         st.session_state["market_scan_done"] = True
         with st.spinner("BIST 30 hisseleri taranıyor ve analiz ediliyor..."):
-            scan_df = get_cached_market_scan(tuple(config.TICKERS))
+            scan_df, failed_tickers = get_cached_market_scan(tuple(config.TICKERS))
+
+        if failed_tickers:
+            st.warning(
+                f"⚠️ {len(failed_tickers)} hisse için veri alınamadı ve taramaya dahil edilmedi: "
+                + ", ".join(t.replace(".IS", "") for t in failed_tickers)
+            )
 
         if scan_df is not None and not scan_df.empty:
             top_bull = scan_df.head(5)

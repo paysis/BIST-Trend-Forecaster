@@ -156,3 +156,25 @@ def test_scanner_tab_stays_usable_when_selected_ticker_has_no_data(monkeypatch):
 
     assert any("piyasa verisi alınamadı" in w.value for w in at.warning)
     assert any(b.key == "btn_start_scan" for b in at.button)
+
+
+def test_scanner_lists_tickers_without_data(monkeypatch):
+    panel = _fake_download_panel()
+    single = panel.copy()
+    single.columns = single.columns.get_level_values(0)
+
+    def download(tickers, *args, **kwargs):
+        if isinstance(tickers, str):
+            return panel.copy()
+        empty = pd.DataFrame(np.nan, index=single.index, columns=single.columns)
+        return pd.concat({sym: (empty if sym == "SASA.IS" else single) for sym in tickers}, axis=1)
+
+    monkeypatch.setattr(yfinance, "download", download)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    assert list(at.exception) == []
+    assert any("1 hisse için veri alınamadı" in w.value and "SASA" in w.value for w in at.warning)
+    assert len(at.dataframe[-1].value) == len(config.TICKERS) - 1

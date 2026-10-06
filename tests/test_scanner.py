@@ -88,7 +88,7 @@ def test_scan_market_sorts_by_probability_descending(monkeypatch, dummy_model, f
     monkeypatch.setattr(yfinance, "download", batch_download(make_frame))
 
     tickers = ["AKBNK.IS", "GARAN.IS", "THYAO.IS"]
-    df_scan = scanner.scan_market(tickers, dummy_model)
+    df_scan, failed = scanner.scan_market(tickers, dummy_model)
 
     assert len(df_scan) == 3
     # Olasılıklar birbirinden farklı olmalı ki sıralama gerçekten sınansın
@@ -97,7 +97,7 @@ def test_scan_market_sorts_by_probability_descending(monkeypatch, dummy_model, f
 
 
 def test_scan_market_handles_empty_list(dummy_model):
-    df_scan = scanner.scan_market([], dummy_model)
+    df_scan, failed = scanner.scan_market([], dummy_model)
     assert df_scan.empty
     assert "Hisse" in df_scan.columns
     assert "_prob" in df_scan.columns
@@ -109,19 +109,42 @@ def test_scan_market_continues_on_partial_failure(monkeypatch, dummy_model, fake
     ))
 
     tickers = ["AKBNK.IS", "FAIL.IS", "THYAO.IS"]
-    df_scan = scanner.scan_market(tickers, dummy_model)
+    df_scan, failed = scanner.scan_market(tickers, dummy_model)
 
     assert len(df_scan) == 2
     assert "FAIL.IS" not in df_scan["ticker_code"].values
+    assert failed == ["FAIL.IS"]
 
 
 def test_scan_market_downloads_all_symbols_in_one_request(monkeypatch, dummy_model, fake_panel):
     calls = []
     monkeypatch.setattr(yfinance, "download", batch_download(lambda symbol: fake_panel.copy(), calls))
 
-    df_scan = scanner.scan_market(["AKBNK.IS", "KOZAL.IS", "THYAO.IS"], dummy_model)
+    df_scan, failed = scanner.scan_market(["AKBNK.IS", "KOZAL.IS", "THYAO.IS"], dummy_model)
 
     assert len(calls) == 1
     # Yahoo'da adı değişen hisse güncel sembolüyle istenmeli
     assert sorted(calls[0]) == ["AKBNK.IS", "THYAO.IS", "TRALT.IS"]
     assert set(df_scan["ticker_code"]) == {"AKBNK.IS", "KOZAL.IS", "THYAO.IS"}
+
+
+def test_scan_market_reports_no_failures_on_success(monkeypatch, dummy_model, fake_panel):
+    monkeypatch.setattr(yfinance, "download", batch_download(lambda symbol: fake_panel.copy()))
+
+    _, failed = scanner.scan_market(["AKBNK.IS", "THYAO.IS"], dummy_model)
+
+    assert failed == []
+
+
+@pytest.mark.parametrize("error", [KeyError, ValueError])
+def test_scan_market_does_not_hide_model_errors(monkeypatch, fake_panel, error):
+    """Model hataları "veri alınamadı" gibi görünmemeli; çağırana ulaşmalı.
+    XGBoost öznitelik uyumsuzluğunda ValueError fırlattığı için o da kapsanır."""
+    class BrokenModel:
+        def predict_proba(self, X):
+            raise error("feature mismatch")
+
+    monkeypatch.setattr(yfinance, "download", batch_download(lambda symbol: fake_panel.copy()))
+
+    with pytest.raises(error):
+        scanner.scan_market(["AKBNK.IS"], BrokenModel())
