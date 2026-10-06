@@ -4,6 +4,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import xgboost
 import yfinance
 from streamlit.testing.v1 import AppTest
 
@@ -65,10 +66,9 @@ def test_app_renders_a_single_prediction_without_error(patched_download):
     assert list(at.exception) == []
     assert not any("Bir hata oluştu" in e.value for e in at.error)
 
-    # Tam olarak bir yön kutusu render edilmeli: yukarı (success) ya da düşüş (error).
-    assert len(at.success) + len(at.error) == 1
+    # Yön kutusu ve güven skoru, sinyalin rengini taşıyan iki kutu olarak render edilmeli.
+    assert len(at.success) + len(at.warning) + len(at.error) == 2
     assert len(at.metric) == 1
-    assert len(at.info) == 1
 
 
 def test_app_uses_most_recent_trading_day_for_prediction(patched_download):
@@ -86,3 +86,58 @@ def test_app_uses_most_recent_trading_day_for_prediction(patched_download):
         expected.reset_index(drop=True),
         check_exact=False,
     )
+
+
+@pytest.fixture
+def fixed_probability(monkeypatch):
+    """Modelin artış olasılığını sabitler; UI'ın sinyal etiketlemesini
+    eğitilmiş modelden bağımsız test etmeyi sağlar."""
+    def _set(prob):
+        monkeypatch.setattr(
+            xgboost.XGBClassifier, "predict_proba",
+            lambda self, X: np.array([[1.0 - prob, prob]]),
+        )
+    return _set
+
+
+def _boxes(at):
+    return {
+        "success": [e.value for e in at.success],
+        "warning": [e.value for e in at.warning],
+        "error": [e.value for e in at.error],
+    }
+
+
+@pytest.mark.parametrize(
+    "prob, kind, label",
+    [
+        (0.60, "success", "YÜKSELİŞ"),
+        (0.50, "warning", "NÖTR"),
+        (0.40, "error", "DÜŞÜŞ"),
+    ],
+)
+def test_direction_and_confidence_share_signal_color(patched_download, fixed_probability, prob, kind, label):
+    fixed_probability(prob)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    boxes = _boxes(at)
+    # Yön kutusu ve güven skoru aynı renkte (aynı türde) render edilmeli
+    assert len(boxes[kind]) == 2
+    assert any(label in v for v in boxes[kind])
+    assert any(f"%{prob * 100:.1f}" in v for v in boxes[kind])
+    assert sum(len(v) for v in boxes.values()) == 2
+
+
+@pytest.mark.parametrize("prob", [0.49, 0.50, 0.51])
+def test_coin_flip_probabilities_render_as_neutral(patched_download, fixed_probability, prob):
+    fixed_probability(prob)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert any("NÖTR" in e.value for e in at.warning)
+    assert not any("YÜKSELİŞ" in e.value for e in at.success)
+    assert not any("DÜŞÜŞ" in e.value for e in at.error)
