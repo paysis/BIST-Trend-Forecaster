@@ -188,3 +188,21 @@ def test_refresh_button_appears_right_after_first_scan(patched_download):
     at.button(key="btn_start_scan").click().run()
 
     assert any(b.key == "btn_refresh_scan" for b in at.button)
+
+
+def test_scanner_tables_use_consistent_number_formats(patched_download):
+    import json
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    # Tab 1'deki indikatör tablosundan sonraki 3 tablo tarama tablolarıdır
+    scan_tables = at.dataframe[-3:]
+    assert len(scan_tables) == 3
+    for table in scan_tables:
+        formats = {col: cfg["type_config"]["format"] for col, cfg in json.loads(table.proto.columns).items()
+                   if "format" in cfg.get("type_config", {})}
+        assert formats["Son Fiyat (TL)"] == "%.2f"
+        assert formats["Günlük Değişim (%)"] == "%.2f"
+        assert formats["Yükseliş Olasılığı (%)"] == "%.1f"

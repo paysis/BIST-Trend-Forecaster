@@ -121,6 +121,14 @@ def render_single_ticker_tab():
             st.markdown("- **RSI** aşırı alım bölgesinde (70 üstü), düzeltme gelebilir.")
 
 
+# Tarama tablolarında sayıların tutarlı ondalıkla gösterimi (örn. 1.9 yerine 1.90)
+SCAN_COLUMN_CONFIG = {
+    "Son Fiyat (TL)": st.column_config.NumberColumn(format="%.2f"),
+    "Günlük Değişim (%)": st.column_config.NumberColumn(format="%.2f"),
+    "Yükseliş Olasılığı (%)": st.column_config.NumberColumn(format="%.1f"),
+}
+
+
 def render_market_scanner_tab():
     st.subheader("📊 BIST 30 Piyasa Fırsat Radarı")
     st.markdown("""
@@ -157,19 +165,22 @@ def render_market_scanner_tab():
                 st.markdown("### 🟢 En Yüksek Yükseliş Potansiyeli (Top 5)")
                 st.dataframe(
                     top_bull[["Hisse", "Son Fiyat (TL)", "Günlük Değişim (%)", "Yükseliş Olasılığı (%)"]],
-                    hide_index=True
+                    hide_index=True,
+                    column_config=SCAN_COLUMN_CONFIG,
                 )
             with c2:
                 st.markdown("### 🔴 Düşüş Riski En Yüksek (Top 5)")
                 st.dataframe(
                     top_bear[["Hisse", "Son Fiyat (TL)", "Günlük Değişim (%)", "Yükseliş Olasılığı (%)"]],
-                    hide_index=True
+                    hide_index=True,
+                    column_config=SCAN_COLUMN_CONFIG,
                 )
 
             st.markdown("### 📋 Tüm BIST 30 Liderlik Tablosu")
             st.dataframe(
                 scan_df[["Hisse", "Son Fiyat (TL)", "Günlük Değişim (%)", "Yükseliş Olasılığı (%)", "Tahmin"]],
-                hide_index=True
+                hide_index=True,
+                column_config=SCAN_COLUMN_CONFIG,
             )
         else:
             st.warning("Piyasa verileri taranırken veri alınamadı.")
