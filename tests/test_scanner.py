@@ -13,9 +13,8 @@ def dummy_model():
     """Test için basit bir XGBoost modeli simülasyonu."""
     class DummyModel:
         def predict_proba(self, X):
-            # İlk özelliğe göre deterministik olasılık
-            val = float(X.iloc[0, 0])
-            prob = 1.0 / (1.0 + np.exp(-val))
+            # RSI'a göre deterministik olasılık (RSI 0-100 -> olasılık 0-1)
+            prob = float(X["rsi"].iloc[0]) / 100.0
             return np.array([[1.0 - prob, prob]])
     return DummyModel()
 
@@ -57,13 +56,14 @@ def test_predict_single_ticker_handles_empty_data(monkeypatch, dummy_model):
 
 
 def test_scan_market_sorts_by_probability_descending(monkeypatch, dummy_model, fake_panel):
-    # Farklı hisseler için farklı fiyatlar/indikatörler dönelim
+    # Farklı fiyat şekilleri farklı RSI, dolayısıyla farklı olasılık üretir.
+    # (Fiyatı sabit bir katsayıyla ölçeklemek RSI'ı değiştirmez.)
     def custom_download(ticker, *args, **kwargs):
         df = fake_panel.copy()
-        if "GARAN" in ticker:
-            df["Close"] = df["Close"] * 2.0
-        elif "THYAO" in ticker:
-            df["Close"] = df["Close"] * 0.5
+        if "GARAN" in ticker:  # sürekli düşüş -> RSI ~ 0
+            df["Close"] = df["Close"].to_numpy()[::-1]
+        elif "THYAO" in ticker:  # yatay dalgalanma -> RSI ~ 50
+            df["Close"] = 100.0 + np.sin(np.arange(len(df)))
         return df
 
     monkeypatch.setattr(yfinance, "download", custom_download)
@@ -72,10 +72,9 @@ def test_scan_market_sorts_by_probability_descending(monkeypatch, dummy_model, f
     df_scan = scanner.scan_market(tickers, dummy_model)
 
     assert len(df_scan) == 3
-    # Azalan sırada sıralı olmalı
-    probs = df_scan["_prob"].tolist()
-    assert probs == sorted(probs, reverse=True)
-    assert set(df_scan["ticker_code"]) == set(tickers)
+    # Olasılıklar birbirinden farklı olmalı ki sıralama gerçekten sınansın
+    assert df_scan["_prob"].nunique() == 3
+    assert df_scan["ticker_code"].tolist() == ["AKBNK.IS", "THYAO.IS", "GARAN.IS"]
 
 
 def test_scan_market_handles_empty_list(dummy_model):
