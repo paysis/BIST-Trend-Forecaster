@@ -1,43 +1,17 @@
 # src/scanner.py
 # BIST 30 hisselerinin tamamını modelden geçirip fırsat radarı sıralaması oluşturan modül
 import pandas as pd
-import numpy as np
-import yfinance as yf
-from src import config, features
+from src import live_data
 
 
-def predict_single_ticker(ticker, model, period="6mo"):
+def predict_single_ticker(ticker, model):
     """
     Tek bir hisse senedi için canlı piyasa verisini çeker, teknik indikatörleri hesaplar
     ve modelin artış olasılığı ile son fiyat metriklerini sözlük olarak döndürür.
     """
-    yahoo_ticker = getattr(config, "TICKER_YAHOO_MAP", {}).get(ticker, ticker)
-    df = yf.download(yahoo_ticker, period=period, progress=False)
-
-    if df is None or df.empty or len(df) == 0:
-        return None
-
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-
-    df["ticker"] = ticker.replace(".IS", "")
-    df.reset_index(inplace=True)
-
-    new_columns = {}
-    for col in df.columns:
-        if col.lower() in ("date", "index"):
-            new_columns[col] = "Date"
-        elif col.lower() == "ticker":
-            new_columns[col] = "ticker"
-        else:
-            new_columns[col] = col.lower()
-
-    df.rename(columns=new_columns, inplace=True)
-    if "Date" not in df.columns or len(df) < 15:
-        return None
-
-    df_processed = features.add_features(df, drop_incomplete_target=False)
-    if df_processed.empty:
+    try:
+        df_processed, df = live_data.fetch_live_frame(ticker)
+    except ValueError:
         return None
 
     features_list = [

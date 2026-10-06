@@ -2,10 +2,9 @@
 import streamlit as st
 import pandas as pd
 import xgboost as xgb
-import yfinance as yf
 import ta
 import plotly.graph_objects as go
-from src import config, features, scanner
+from src import config, live_data, scanner
 import os
 
 # Sayfa Ayarları
@@ -36,49 +35,7 @@ def load_model():
 # Canlı Veri Çekme ve İşleme Fonksiyonu
 @st.cache_data(ttl=900, show_spinner=False)
 def get_prediction_data(ticker):
-    # Yahoo Finance sembolü değişen hisseleri eşle (Örn: KOZAL -> TRALT)
-    yahoo_ticker = getattr(config, "TICKER_YAHOO_MAP", {}).get(ticker, ticker)
-    
-    # Modelin indikatörleri hesaplayabilmesi için son 6 ayın verisine ihtiyacı var
-    df = yf.download(yahoo_ticker, period="6mo", progress=False)
-    
-    if df is None or df.empty or len(df) == 0:
-        raise ValueError(
-            f"'{ticker}' (Yahoo: '{yahoo_ticker}') için piyasa verisi alınamadı. "
-            "Sembol değişmiş veya Yahoo Finance servisi yanıt vermiyor olabilir."
-        )
-    
-    if isinstance(df.columns, pd.MultiIndex):
-        df.columns = df.columns.get_level_values(0)
-    
-    # DÜZELTME BURADA: 'Ticker' yerine küçük harfle 'ticker' yaptık
-    df['ticker'] = ticker.replace(".IS", "")
-    
-    df.reset_index(inplace=True)
-    
-    # Sütun isimlerini düzenle (features.py 'Date' ve küçük harfli sütunlar bekliyor)
-    new_columns = {}
-    for col in df.columns:
-        if col.lower() in ('date', 'index'):
-            new_columns[col] = 'Date' # Date büyük kalsın
-        elif col.lower() == 'ticker':
-            new_columns[col] = 'ticker' # ticker küçük kalsın
-        else:
-            new_columns[col] = col.lower() # open, close, high, low vs. küçük olsun
-            
-    df.rename(columns=new_columns, inplace=True)
-    
-    if 'Date' not in df.columns:
-        raise ValueError(f"'{ticker}' için çekilen veride 'Date' sütunu bulunamadı.")
-    
-    # Feature Engineering Scriptini Kullan
-    # drop_incomplete_target=False: canlı tahminde bugünün hedefi (yarının kapanışı)
-    # henüz bilinmez; bu normalde eğitimde düşürülen son günü burada tutar.
-    df_processed = features.add_features(df, drop_incomplete_target=False)
-    
-    if df_processed.empty:
-        raise ValueError(f"'{ticker}' verisi teknik indikatörler hesaplandıktan sonra yetersiz kaldı.")
-
+    df_processed, df = live_data.fetch_live_frame(ticker)
     # Sadece en son günü al (Yarın için tahmin yapacağız)
     last_row = df_processed.iloc[[-1]]
     return last_row, df # df grafik çizimi için lazım
