@@ -4,7 +4,7 @@ import pandas as pd
 import xgboost as xgb
 import ta
 import plotly.graph_objects as go
-from src import config, explain, features, live_data, scanner, signals
+from src import backtest, config, explain, features, live_data, scanner, signals
 import os
 
 # Sayfa Ayarları
@@ -46,10 +46,8 @@ def load_model():
 # Canlı Veri Çekme ve İşleme Fonksiyonu
 @st.cache_data(ttl=900, show_spinner=False)
 def get_prediction_data(ticker):
-    df_processed, df = live_data.fetch_live_frame(ticker)
-    # Sadece en son günü al (Yarın için tahmin yapacağız)
-    last_row = df_processed.iloc[[-1]]
-    return last_row, df # df grafik çizimi için lazım
+    # df_processed: tahmin (son satır) ve backtest için; df: grafik çizimi için
+    return live_data.fetch_live_frame(ticker)
 
 
 # Tüm BIST 30 Hisseleri için Önbellekli Tarama Fonksiyonu
@@ -63,7 +61,9 @@ def render_single_ticker_tab():
     model = load_model()
     # Kullanıcı butona bastığında veya sayfa yüklendiğinde
     with st.spinner(f'{selected_ticker} verileri analiz ediliyor...'):
-        input_data, full_df = get_prediction_data(selected_ticker_full)
+        df_processed, full_df = get_prediction_data(selected_ticker_full)
+        # Sadece en son günü al (Yarın için tahmin yapacağız)
+        input_data = df_processed.iloc[[-1]]
 
         # Gerekli Featurelar
         features_list = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width', 
@@ -156,6 +156,50 @@ def render_single_ticker_tab():
 
         st.write("Son günün teknik verileri:")
         st.dataframe(input_data[['rsi', 'macd', 'sma_10', 'sma_50', 'volatility']])
+
+        render_backtest(model, df_processed[['Date', 'close'] + features_list])
+
+
+BACKTEST_MONTHS = 6
+
+
+def render_backtest(model, df_processed):
+    """Modelin yükseliş sinyallerini izleyen al/nakit stratejisini al-tut ile kıyaslar."""
+    st.subheader(f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)")
+    window = backtest.recent_window(df_processed, months=BACKTEST_MONTHS)
+    probs = model.predict_proba(window.drop(columns=['Date', 'close']))[:, 1]
+    result = backtest.run_backtest(window, probs, threshold=prob_high)
+
+    fig = go.Figure()
+    for column, name, color in (("strategy", "Model Stratejisi", "#1f77b4"),
+                                ("buy_hold", "Al ve Tut", "#7f7f7f")):
+        fig.add_trace(go.Scatter(
+            x=result.curve.index, y=result.curve[column] * 100,
+            mode="lines", name=name, line={"color": color},
+        ))
+    fig.update_layout(yaxis_title="Kümülatif Getiri (%)", hovermode="x unified")
+    st.plotly_chart(fig, width='stretch')
+
+    summary = pd.DataFrame(
+        [result.strategy, result.buy_hold], index=["Model Stratejisi", "Al ve Tut"]
+    )
+    table = pd.DataFrame({
+        "Toplam Getiri (%)": summary["total_return"] * 100,
+        "Sharpe Oranı": summary["sharpe"],
+        "Maks. Değer Kaybı (%)": summary["max_drawdown"] * 100,
+    })
+    st.dataframe(table, column_config={
+        "Toplam Getiri (%)": st.column_config.NumberColumn(format="%.2f"),
+        "Sharpe Oranı": st.column_config.NumberColumn(format="%.2f"),
+        "Maks. Değer Kaybı (%)": st.column_config.NumberColumn(format="%.2f"),
+    })
+    st.caption(
+        f"Strateji, yükseliş olasılığı %{prob_high * 100:.0f} ve üzerindeyken hissede kalır, "
+        "aksi halde nakde geçer (getiri %0). "
+        f"Hissede kalınan gün oranı: %{result.exposure * 100:.0f} · "
+        f"Pozisyon değişikliği: {result.trades}. "
+        "Komisyon ve vergiler dahil değildir; geçmiş performans gelecekteki sonuçları garanti etmez."
+    )
 
 
 # Tarama tablolarında sayıların tutarlı ondalıkla gösterimi (örn. 1.9 yerine 1.90)

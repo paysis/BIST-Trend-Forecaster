@@ -1,4 +1,5 @@
 # tests/test_app_ui.py - app.py'yi streamlit.testing.v1.AppTest ile uçtan uca test eder
+import json
 from pathlib import Path
 
 import numpy as np
@@ -104,6 +105,11 @@ def _plotly_charts(at):
     return at.get("plotly_chart")
 
 
+def _chart_traces(at):
+    """Her Plotly grafiğinin iz (trace) listesi."""
+    return [json.loads(chart.proto.spec)["data"] for chart in _plotly_charts(at)]
+
+
 def test_explanation_replaces_static_rsi_rules(patched_download):
     """Fikstürde RSI 100'dür; eski kural tabanlı metin "aşırı alım" basardı."""
     at = AppTest.from_file(APP_PATH, default_timeout=30)
@@ -133,8 +139,7 @@ def test_explanation_renders_contribution_waterfall(patched_download):
     at.run()
 
     assert list(at.exception) == []
-    # Fiyat grafiği + katkı şelale grafiği
-    assert len(_plotly_charts(at)) == 2
+    assert any(trace["type"] == "waterfall" for traces in _chart_traces(at) for trace in traces)
 
 
 @pytest.fixture
@@ -144,7 +149,7 @@ def fixed_probability(monkeypatch):
     def _set(prob):
         monkeypatch.setattr(
             xgboost.XGBClassifier, "predict_proba",
-            lambda self, X: np.array([[1.0 - prob, prob]]),
+            lambda self, X: np.tile([1.0 - prob, prob], (len(X), 1)),
         )
     return _set
 
@@ -207,6 +212,71 @@ def test_min_confidence_slider_widens_neutral_band(patched_download, fixed_proba
     assert list(at.exception) == []
     assert any("NÖTR" in e.value for e in at.warning)
     assert not at.success
+
+
+def _backtest_table(at):
+    return next(df.value for df in at.dataframe if "Toplam Getiri (%)" in df.value.columns)
+
+
+def test_backtest_compares_model_strategy_with_buy_and_hold(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    assert any("Backtest" in h.value for h in at.subheader)
+    curves = [t for traces in _chart_traces(at) for t in traces if t.get("name") in ("Model Stratejisi", "Al ve Tut")]
+    assert sorted(t["name"] for t in curves) == ["Al ve Tut", "Model Stratejisi"]
+
+    table = _backtest_table(at)
+    assert list(table.index) == ["Model Stratejisi", "Al ve Tut"]
+    assert list(table.columns) == ["Toplam Getiri (%)", "Sharpe Oranı", "Maks. Değer Kaybı (%)"]
+
+
+def test_backtest_matches_buy_and_hold_when_always_bullish(patched_download, fixed_probability):
+    fixed_probability(0.60)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    table = _backtest_table(at)
+    assert table.loc["Al ve Tut", "Toplam Getiri (%)"] > 0
+    pd.testing.assert_series_equal(
+        table.loc["Model Stratejisi"], table.loc["Al ve Tut"], check_names=False
+    )
+
+
+def test_backtest_stays_in_cash_when_never_bullish(patched_download, fixed_probability):
+    fixed_probability(0.50)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    table = _backtest_table(at)
+    assert table.loc["Model Stratejisi", "Toplam Getiri (%)"] == 0
+    assert table.loc["Model Stratejisi", "Maks. Değer Kaybı (%)"] == 0
+    assert table.loc["Al ve Tut", "Toplam Getiri (%)"] > 0
+
+
+def test_backtest_uses_selected_confidence_threshold(patched_download, fixed_probability):
+    fixed_probability(0.56)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert _backtest_table(at).loc["Model Stratejisi", "Toplam Getiri (%)"] > 0
+
+    at.sidebar.slider[0].set_value(0.60).run()
+    assert _backtest_table(at).loc["Model Stratejisi", "Toplam Getiri (%)"] == 0
+
+
+def test_backtest_caption_reports_exposure_and_trades(patched_download, fixed_probability):
+    fixed_probability(0.60)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    # Hep yükseliş sinyali: tüm günlerde hissede, yalnızca ilk giriş işlemi
+    assert any("Hissede kalınan gün oranı: %100" in c.value and "Pozisyon değişikliği: 1" in c.value
+               for c in at.caption)
 
 
 def test_app_market_scanner_tab_triggers_and_renders(patched_download):
