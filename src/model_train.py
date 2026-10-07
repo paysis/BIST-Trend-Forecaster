@@ -4,9 +4,10 @@ import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import classification_report
 import config
 import features
+import metrics
 import tune as tune_module
 
 
@@ -66,6 +67,9 @@ def train_model(tune=False, n_trials=50):
     print(f"Tarih Kesimi (Cutoff): {cutoff_str}")
     print(f"Eğitim Verisi: {X_train.shape} (Tarih Aralığı: {train_start} - {train_end})")
     print(f"Test Verisi: {X_test.shape} (Tarih Aralığı: {test_start} - {test_end})")
+    for name, y_part in (("Eğitim", y_train), ("Test", y_test)):
+        dist = metrics.class_distribution(y_part)
+        print(f"{name} Sınıf Dağılımı: Yükseliş %{dist[1] * 100:.1f} / Düşüş %{dist[0] * 100:.1f}")
     
     # 4. Model Tanımlama ve Eğitim (XGBoost)
     # Varsayılan: manuel parametreler. --tune ile Optuna optimizasyonu yapılır.
@@ -83,9 +87,15 @@ def train_model(tune=False, n_trials=50):
     model.fit(X_train, y_train)
     
     # 5. Değerlendirme
-    preds = model.predict(X_test)
-    acc = accuracy_score(y_test, preds)
+    proba = model.predict_proba(X_test)[:, 1]
+    preds = (proba >= 0.5).astype(int)
+    scores = metrics.evaluate(y_test, proba)
+    acc = scores['accuracy']
     print(f"\n🎯 Model Doğruluğu (Test Seti): {acc:.4f}")
+    print(f"Dengeli Doğruluk (Balanced Accuracy): {scores['balanced_accuracy']:.4f}")
+    print(f"ROC-AUC: {scores['roc_auc']:.4f}")
+    print(f"Log Loss: {scores['log_loss']:.4f}")
+    print(f"Kesinlik (Precision, Yükseliş): {scores['precision']:.4f}")
     print("\nSınıflandırma Raporu:")
     print(classification_report(y_test, preds))
     

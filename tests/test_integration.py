@@ -56,3 +56,12 @@ def test_shipped_model_still_loads():
     model = xgb.XGBClassifier()
     model.load_model(config.MODEL_PATH)
     assert model.n_features_in_ == len(FEATURES)
+
+
+def test_train_model_reports_imbalance_aware_metrics(small_dataset, capsys):
+    model_train.train_model()
+    out = capsys.readouterr().out
+    assert "Eğitim Sınıf Dağılımı" in out
+    assert "Test Sınıf Dağılımı" in out
+    for label in ("Dengeli Doğruluk", "ROC-AUC", "Log Loss"):
+        assert label in out
