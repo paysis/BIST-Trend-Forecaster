@@ -88,3 +88,25 @@ def test_run_study_is_reproducible_with_seed(synthetic_data):
     b = tune.run_study(X, y, dates, n_trials=3, n_splits=2, seed=7)
     assert a.best_params == b.best_params
     assert a.best_value == pytest.approx(b.best_value)
+
+
+@pytest.mark.parametrize("metric", tune.METRICS)
+def test_objective_supports_each_metric(synthetic_data, metric):
+    X, y, dates = synthetic_data
+    objective = tune.make_objective(X, y, dates, n_splits=2, metric=metric)
+    study = optuna.create_study(direction="maximize")
+    study.enqueue_trial({"n_estimators": 50, "max_depth": 2, "min_child_weight": 1})
+    score = objective(study.ask())
+    assert 0.6 < score <= 1.0
+
+
+def test_objective_rejects_unknown_metric(synthetic_data):
+    X, y, dates = synthetic_data
+    with pytest.raises(ValueError, match="metric"):
+        tune.make_objective(X, y, dates, metric="f1")
+
+
+def test_run_study_records_metric(synthetic_data):
+    X, y, dates = synthetic_data
+    study = tune.run_study(X, y, dates, n_trials=2, n_splits=2, metric="roc_auc")
+    assert study.user_attrs["metric"] == "roc_auc"

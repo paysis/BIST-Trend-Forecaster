@@ -3,7 +3,8 @@
 import numpy as np
 import optuna
 import xgboost as xgb
-from sklearn.metrics import accuracy_score
+
+import metrics
 
 # model_train.py'deki manuel parametreler: optimizasyon bu noktadan başlar
 DEFAULT_PARAMS = {
@@ -11,6 +12,9 @@ DEFAULT_PARAMS = {
     'learning_rate': 0.05,
     'max_depth': 5,
 }
+
+# Optuna'nın maksimize edebileceği CV metrikleri (metrics.evaluate anahtarları)
+METRICS = ('accuracy', 'balanced_accuracy', 'roc_auc')
 
 # XGBoost'a her denemede sabit geçilen parametreler
 FIXED_PARAMS = {
@@ -57,8 +61,10 @@ def time_series_folds(dates, n_splits=3):
         yield train_idx, val_idx
 
 
-def make_objective(X, y, dates, n_splits=3):
-    """Zaman serisi CV'sindeki ortalama doğruluğu maksimize eden objective fonksiyonu."""
+def make_objective(X, y, dates, n_splits=3, metric='accuracy'):
+    """Zaman serisi CV'sindeki seçilen metriğin ortalamasını maksimize eden objective fonksiyonu."""
+    if metric not in METRICS:
+        raise ValueError(f"Bilinmeyen metric: {metric!r}. Seçenekler: {', '.join(METRICS)}")
     folds = list(time_series_folds(dates, n_splits))
 
     def objective(trial):
@@ -67,8 +73,8 @@ def make_objective(X, y, dates, n_splits=3):
         for step, (train_idx, val_idx) in enumerate(folds):
             model = xgb.XGBClassifier(**params, **FIXED_PARAMS)
             model.fit(X.iloc[train_idx], y.iloc[train_idx])
-            preds = model.predict(X.iloc[val_idx])
-            scores.append(accuracy_score(y.iloc[val_idx], preds))
+            proba = model.predict_proba(X.iloc[val_idx])[:, 1]
+            scores.append(metrics.evaluate(y.iloc[val_idx], proba)[metric])
 
             # Kötü giden denemeleri erkenden buda
             trial.report(float(np.mean(scores)), step)
@@ -79,7 +85,7 @@ def make_objective(X, y, dates, n_splits=3):
     return objective
 
 
-def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None):
+def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None, metric='accuracy'):
     """
     Optuna çalışmasını başlatır ve tamamlanmış study nesnesini döndürür.
     En iyi parametreler: study.best_params
@@ -89,7 +95,8 @@ def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None):
         sampler=optuna.samplers.TPESampler(seed=seed),
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5),
     )
+    study.set_user_attr('metric', metric)
     # Mevcut manuel parametreleri ilk deneme olarak ekle (baseline)
     study.enqueue_trial(DEFAULT_PARAMS)
-    study.optimize(make_objective(X, y, dates, n_splits), n_trials=n_trials, timeout=timeout)
+    study.optimize(make_objective(X, y, dates, n_splits, metric), n_trials=n_trials, timeout=timeout)
     return study
