@@ -61,7 +61,14 @@ def time_series_folds(dates, n_splits=3):
         yield train_idx, val_idx
 
 
-def make_objective(X, y, dates, n_splits=3, metric='accuracy'):
+def class_weight_params(y, balance):
+    """balance=True ise eğitim etiketlerinden scale_pos_weight üretir."""
+    if not balance:
+        return {}
+    return {'scale_pos_weight': metrics.scale_pos_weight(y)}
+
+
+def make_objective(X, y, dates, n_splits=3, metric='accuracy', balance_classes=False):
     """Zaman serisi CV'sindeki seçilen metriğin ortalamasını maksimize eden objective fonksiyonu."""
     if metric not in METRICS:
         raise ValueError(f"Bilinmeyen metric: {metric!r}. Seçenekler: {', '.join(METRICS)}")
@@ -71,8 +78,11 @@ def make_objective(X, y, dates, n_splits=3, metric='accuracy'):
         params = suggest_params(trial)
         scores = []
         for step, (train_idx, val_idx) in enumerate(folds):
-            model = xgb.XGBClassifier(**params, **FIXED_PARAMS)
-            model.fit(X.iloc[train_idx], y.iloc[train_idx])
+            y_train = y.iloc[train_idx]
+            # Ağırlık yalnızca bu katın eğitim etiketlerinden hesaplanır (sızıntı yok)
+            model = xgb.XGBClassifier(**params, **FIXED_PARAMS,
+                                      **class_weight_params(y_train, balance_classes))
+            model.fit(X.iloc[train_idx], y_train)
             proba = model.predict_proba(X.iloc[val_idx])[:, 1]
             scores.append(metrics.evaluate(y.iloc[val_idx], proba)[metric])
 
@@ -85,7 +95,8 @@ def make_objective(X, y, dates, n_splits=3, metric='accuracy'):
     return objective
 
 
-def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None, metric='accuracy'):
+def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None, metric='accuracy',
+              balance_classes=False):
     """
     Optuna çalışmasını başlatır ve tamamlanmış study nesnesini döndürür.
     En iyi parametreler: study.best_params
@@ -96,7 +107,9 @@ def run_study(X, y, dates, n_trials=50, n_splits=3, seed=42, timeout=None, metri
         pruner=optuna.pruners.MedianPruner(n_startup_trials=5),
     )
     study.set_user_attr('metric', metric)
+    study.set_user_attr('balance_classes', balance_classes)
     # Mevcut manuel parametreleri ilk deneme olarak ekle (baseline)
     study.enqueue_trial(DEFAULT_PARAMS)
-    study.optimize(make_objective(X, y, dates, n_splits, metric), n_trials=n_trials, timeout=timeout)
+    study.optimize(make_objective(X, y, dates, n_splits, metric, balance_classes),
+                   n_trials=n_trials, timeout=timeout)
     return study
