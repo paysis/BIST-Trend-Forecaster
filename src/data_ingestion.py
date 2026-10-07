@@ -1,7 +1,7 @@
 # src/data_ingestion.py
-import yfinance as yf
 import pandas as pd
 import config
+import network
 import os
 
 def fetch_data():
@@ -12,7 +12,7 @@ def fetch_data():
         try:
             # Veriyi çek (Yahoo Finance sembol değişikliği varsa eşle)
             yahoo_ticker = getattr(config, "TICKER_YAHOO_MAP", {}).get(ticker, ticker)
-            df = yf.download(yahoo_ticker, start=config.START_DATE, end=config.END_DATE, progress=False)
+            df = network.download_with_retry(yahoo_ticker, start=config.START_DATE, end=config.END_DATE, progress=False)
             
             # Multi-index düzeltmesi (yfinance yeni versiyonları için)
             if isinstance(df.columns, pd.MultiIndex):

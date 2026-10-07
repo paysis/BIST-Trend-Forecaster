@@ -39,6 +39,10 @@ def synthetic_data():
 
 @pytest.fixture(autouse=True)
 def no_retry_delay(monkeypatch):
-    """Yahoo isteklerindeki üstel geri çekilme beklemelerini testlerde atlar."""
-    from src import network
-    monkeypatch.setattr(network, "_sleep", lambda seconds: None)
+    """Yahoo isteklerindeki üstel geri çekilme beklemelerini testlerde atlar.
+    src/ altındaki betikler modülü 'network' olarak, uygulama 'src.network'
+    olarak yükler; ikisi ayrı modül nesneleridir."""
+    import network
+    from src import network as src_network
+    for module in (network, src_network):
+        monkeypatch.setattr(module, "_sleep", lambda seconds: None)
