@@ -44,6 +44,12 @@ def test_prepare_live_frame_rejects_missing_data(raw):
         live_data.prepare_live_frame(raw, "AKBNK.IS")
 
 
+def test_missing_data_message_suggests_retrying_later():
+    """yfinance ağ kesintilerini boş veri olarak döndürür; mesaj bu durumu da kapsamalı."""
+    with pytest.raises(ValueError, match="birkaç dakika sonra tekrar deneyin"):
+        live_data.prepare_live_frame(pd.DataFrame(), "AKBNK.IS")
+
+
 def test_prepare_live_frame_rejects_too_short_history():
     with pytest.raises(ValueError, match="yetersiz"):
         live_data.prepare_live_frame(_raw_panel(n_days=20), "AKBNK.IS")

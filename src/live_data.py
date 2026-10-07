@@ -23,7 +23,8 @@ def prepare_live_frame(raw, ticker):
     if raw is None or raw.empty:
         raise ValueError(
             f"'{ticker}' (Yahoo: '{yahoo_symbol(ticker)}') için piyasa verisi alınamadı. "
-            "Sembol değişmiş veya Yahoo Finance servisi yanıt vermiyor olabilir."
+            "Sembol değişmiş veya Yahoo Finance servisine geçici olarak ulaşılamıyor olabilir; "
+            "lütfen birkaç dakika sonra tekrar deneyin."
         )
 
     df = raw.copy()
