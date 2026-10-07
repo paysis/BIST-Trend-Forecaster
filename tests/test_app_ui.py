@@ -56,8 +56,18 @@ def _expected_last_row(panel, ticker="AKBNK.IS"):
 
 @pytest.fixture
 def patched_download(monkeypatch):
+    """Tek sembol istekleri için `panel`, BIST 30 taramasının toplu isteği için
+    (sembol, alan) sütunlu bir toplu panel döndürür."""
     panel = _fake_download_panel()
-    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    def download(tickers, *args, **kwargs):
+        if isinstance(tickers, str):
+            return panel.copy()
+        single = panel.copy()
+        single.columns = single.columns.get_level_values(0)
+        return pd.concat({sym: single for sym in tickers}, axis=1)
+
+    monkeypatch.setattr(yfinance, "download", download)
     return panel
 
 
@@ -216,4 +226,93 @@ def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     leaderboard = at.dataframe[-1].value
     assert "Hisse" in leaderboard.columns
     assert "Yükseliş Olasılığı (%)" in leaderboard.columns
-    assert len(leaderboard) > 0
+    assert len(leaderboard) == len(config.TICKERS)
+
+
+def test_cached_data_does_not_leak_between_tests_first(monkeypatch):
+    """Aynı hisse için bir önceki testin önbelleğe aldığı veri, sonraki testte
+    farklı bir veri ile yamalanan yf.download'ı gölgelememeli (bkz. _second)."""
+    panel = _fake_download_panel()
+    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert at.metric[0].value == f"{panel[('Close', 'AKBNK.IS')].iloc[-1]:.2f} TL"
+
+
+def test_cached_data_does_not_leak_between_tests_second(monkeypatch):
+    panel = _fake_download_panel()
+    panel.iloc[:, :4] *= 3  # Fiyatlar 3 katı
+    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: panel.copy())
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert at.metric[0].value == f"{panel[('Close', 'AKBNK.IS')].iloc[-1]:.2f} TL"
+
+
+def test_scanner_tab_stays_usable_when_selected_ticker_has_no_data(monkeypatch):
+    """Yan menüde seçili hissenin verisi alınamadığında yalnızca o sekme uyarı
+    göstermeli; Fırsat Radarı sekmesi kullanılabilir kalmalı."""
+    panel = _fake_download_panel()
+    monkeypatch.setattr(
+        yfinance, "download",
+        lambda ticker, *args, **kwargs: pd.DataFrame() if ticker == "AKBNK.IS" else panel.copy(),
+    )
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert any("piyasa verisi alınamadı" in w.value for w in at.warning)
+    assert any(b.key == "btn_start_scan" for b in at.button)
+
+
+def test_scanner_lists_tickers_without_data(monkeypatch):
+    panel = _fake_download_panel()
+    single = panel.copy()
+    single.columns = single.columns.get_level_values(0)
+
+    def download(tickers, *args, **kwargs):
+        if isinstance(tickers, str):
+            return panel.copy()
+        empty = pd.DataFrame(np.nan, index=single.index, columns=single.columns)
+        return pd.concat({sym: (empty if sym == "SASA.IS" else single) for sym in tickers}, axis=1)
+
+    monkeypatch.setattr(yfinance, "download", download)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    assert list(at.exception) == []
+    assert any("1 hisse için veri alınamadı" in w.value and "SASA" in w.value for w in at.warning)
+    assert len(at.dataframe[-1].value) == len(config.TICKERS) - 1
+
+
+def test_refresh_button_appears_right_after_first_scan(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert not any(b.key == "btn_refresh_scan" for b in at.button)
+
+    at.button(key="btn_start_scan").click().run()
+
+    assert any(b.key == "btn_refresh_scan" for b in at.button)
+
+
+def test_scanner_tables_use_consistent_number_formats(patched_download):
+    import json
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    # Tab 1'deki indikatör tablosundan sonraki 3 tablo tarama tablolarıdır
+    scan_tables = at.dataframe[-3:]
+    assert len(scan_tables) == 3
+    for table in scan_tables:
+        formats = {col: cfg["type_config"]["format"] for col, cfg in json.loads(table.proto.columns).items()
+                   if "format" in cfg.get("type_config", {})}
+        assert formats["Son Fiyat (TL)"] == "%.2f"
+        assert formats["Günlük Değişim (%)"] == "%.2f"
+        assert formats["Yükseliş Olasılığı (%)"] == "%.1f"

@@ -1,0 +1,80 @@
+# tests/test_live_data.py - canlı veri hazırlama yardımcılarının birim testleri
+import numpy as np
+import pandas as pd
+import pytest
+import yfinance
+
+from src import live_data
+
+
+def _raw_panel(n_days=120, multiindex_ticker=None):
+    """yf.download çıktısı biçiminde OHLCV; istenirse (Price, Ticker) MultiIndex sütunlu."""
+    dates = pd.bdate_range("2025-01-01", periods=n_days)
+    close = 100.0 + np.arange(n_days) * 0.1
+    df = pd.DataFrame(
+        {"Close": close, "High": close + 1, "Low": close - 1, "Open": close - 0.5, "Volume": 1_000_000.0},
+        index=pd.Index(dates, name="Date"),
+    )
+    if multiindex_ticker:
+        df.columns = pd.MultiIndex.from_product([df.columns, [multiindex_ticker]], names=["Price", "Ticker"])
+    return df
+
+
+def test_yahoo_symbol_maps_renamed_tickers():
+    assert live_data.yahoo_symbol("KOZAL.IS") == "TRALT.IS"
+    assert live_data.yahoo_symbol("THYAO.IS") == "THYAO.IS"
+
+
+@pytest.mark.parametrize("multiindex_ticker", [None, "AKBNK.IS"])
+def test_prepare_live_frame_normalises_columns_and_keeps_latest_day(multiindex_ticker):
+    raw = _raw_panel(multiindex_ticker=multiindex_ticker)
+
+    processed, ohlcv = live_data.prepare_live_frame(raw, "AKBNK.IS")
+
+    assert {"Date", "ticker", "open", "high", "low", "close", "volume"} <= set(ohlcv.columns)
+    assert (ohlcv["ticker"] == "AKBNK").all()
+    # Canlı tahmin için en son işlem günü düşürülmemeli
+    assert processed["Date"].iloc[-1] == raw.index[-1]
+    assert "rsi" in processed.columns
+
+
+@pytest.mark.parametrize("raw", [None, pd.DataFrame()])
+def test_prepare_live_frame_rejects_missing_data(raw):
+    with pytest.raises(ValueError, match="piyasa verisi alınamadı"):
+        live_data.prepare_live_frame(raw, "AKBNK.IS")
+
+
+def test_prepare_live_frame_rejects_too_short_history():
+    with pytest.raises(ValueError, match="yetersiz"):
+        live_data.prepare_live_frame(_raw_panel(n_days=20), "AKBNK.IS")
+
+
+def test_fetch_live_frame_downloads_mapped_symbol(monkeypatch):
+    requested = []
+
+    def fake_download(ticker, *args, **kwargs):
+        requested.append(ticker)
+        return _raw_panel()
+
+    monkeypatch.setattr(yfinance, "download", fake_download)
+
+    live_data.fetch_live_frame("KOZAA.IS")
+    assert requested == ["TRMET.IS"]
+
+
+@pytest.mark.parametrize("multiindex_ticker", [None, "AKBNK.IS"])
+def test_prepare_live_frame_drops_partial_rows_without_prices(multiindex_ticker):
+    """Yahoo seans sonrası bazen günün satırını OHLC'si boş, yalnızca hacmi dolu
+    döndürür. Bu satır fiyat/grafik ve tahmin için kullanılmamalı (#25)."""
+    raw = _raw_panel()
+    partial_day = raw.index[-1] + pd.offsets.BDay(1)
+    raw.loc[partial_day] = [np.nan, np.nan, np.nan, np.nan, 125_773_102.0]
+    if multiindex_ticker:
+        raw.columns = pd.MultiIndex.from_product([raw.columns, [multiindex_ticker]], names=["Price", "Ticker"])
+
+    processed, ohlcv = live_data.prepare_live_frame(raw, "AKBNK.IS")
+
+    assert ohlcv[["open", "high", "low", "close"]].notna().all().all()
+    assert ohlcv["Date"].iloc[-1] == raw.index[-2]
+    # Fiyat metriği, grafik ve tahmin aynı son tam işlem gününü kullanmalı
+    assert processed["Date"].iloc[-1] == ohlcv["Date"].iloc[-1]
