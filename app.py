@@ -4,7 +4,7 @@ import pandas as pd
 import xgboost as xgb
 import ta
 import plotly.graph_objects as go
-from src import config, live_data, scanner
+from src import config, explain, features, live_data, scanner, signals
 import os
 
 # Sayfa Ayarları
@@ -24,6 +24,17 @@ selected_ticker = st.sidebar.selectbox(
     format_func=lambda x: f"{x} (TRALT)" if x == "KOZAL" else (f"{x} (TRMET)" if x == "KOZAA" else x)
 )
 selected_ticker_full = selected_ticker + ".IS"
+
+st.sidebar.header("Sinyal Ayarları")
+min_confidence = st.sidebar.slider(
+    "Minimum Güven Eşiği",
+    min_value=0.51,
+    max_value=0.70,
+    value=config.PROB_THRESHOLD_HIGH,
+    step=0.01,
+    help="Olasılık bu eşiğin üzerinde (ya da 1 - eşik altında) değilse sinyal nötr gösterilir.",
+)
+prob_low, prob_high = signals.symmetric_band(min_confidence)
 
 # Model Yükleme
 @st.cache_resource
@@ -63,7 +74,13 @@ def render_single_ticker_tab():
 
         # Tahmin
         prob = model.predict_proba(X_pred)[0][1] # Artış olasılığı
-        prediction = 1 if prob > 0.5 else 0
+        signal = signals.classify_signal(prob, prob_low, prob_high)
+        # Sinyale göre renkli kutu: yeşil (yükseliş), sarı (nötr), kırmızı (düşüş)
+        signal_box, signal_label = {
+            signals.UP: (st.success, "**YÜKSELİŞ BEKLENTİSİ** 🚀"),
+            signals.NEUTRAL: (st.warning, "**NÖTR / BELİRSİZ PİYASA** ⏸️"),
+            signals.DOWN: (st.error, "**DÜŞÜŞ / ZAYIF TREND** 🔻"),
+        }[signal]
 
         # GÖSTERGE PANELİ
         col1, col2, col3 = st.columns(3)
@@ -91,14 +108,11 @@ def render_single_ticker_tab():
 
         with col2:
             st.write("🤖 **Modelin Yarınki Tahmini:**") # Başlık ekledik ki karışmasın
-            if prediction == 1:
-                st.success(f"YÖN: **YUKARI** 🚀")
-            else:
-                st.error(f"YÖN: **DÜŞÜŞ / YATAY** 🔻")
+            signal_box(signal_label)
 
         with col3:
             st.write("📊 **Güven Skoru:**")
-            st.info(f"%{prob*100:.1f} Olasılıkla")
+            signal_box(f"%{prob*100:.1f} Olasılıkla Yükseliş")
 
         # GRAFİK KISMI (Candlestick)
         st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği")
@@ -111,14 +125,37 @@ def render_single_ticker_tab():
         st.plotly_chart(fig, width='stretch')
 
         # Explainability (PDF Şartı: Neden bu karar?)
+        # Modelin gerçek TreeSHAP katkıları: her özniteliğin bu tahmindeki payı
         st.subheader("Model Neden Bu Kararı Verdi?")
+        explanation, base_prob = explain.explain_prediction(model, X_pred)
+        st.markdown(explain.summarize_drivers(explanation, selected_ticker))
+
+        impacts = explanation['impact'] * 100
+        levels = base_prob * 100 + impacts.cumsum()
+        fig_explain = go.Figure(go.Waterfall(
+            measure=["absolute"] + ["relative"] * len(explanation) + ["total"],
+            x=["Ortalama"] + [explain.FEATURE_LABELS.get(f, f) for f in explanation['feature']] + ["Tahmin"],
+            y=[base_prob * 100] + impacts.tolist() + [0],
+            text=[f"%{base_prob * 100:.1f}"] + [f"{i:+.1f}" for i in impacts] + [f"%{prob * 100:.1f}"],
+            increasing={"marker": {"color": "#2ca02c"}},
+            decreasing={"marker": {"color": "#d62728"}},
+        ))
+        # Başlangıç çubuğu %0'dan başlarsa birkaç puanlık katkılar okunmaz; ekseni yakınlaştır
+        low, high = min(levels.min(), base_prob * 100), max(levels.max(), base_prob * 100)
+        fig_explain.update_layout(
+            yaxis_title="Yükseliş Olasılığı (%)",
+            yaxis_range=[low - 2, high + 2],
+            showlegend=False,
+        )
+        st.plotly_chart(fig_explain, width='stretch')
+        st.caption(
+            "Ortalama: modelin hiçbir göstergeyi bilmeden verdiği olasılık. "
+            "Her çubuk, ilgili göstergenin bugünkü değerinin olasılığı kaç puan "
+            "artırdığını (yeşil) ya da azalttığını (kırmızı) gösterir."
+        )
+
         st.write("Son günün teknik verileri:")
         st.dataframe(input_data[['rsi', 'macd', 'sma_10', 'sma_50', 'volatility']])
-
-        if input_data['rsi'].values[0] < 30:
-            st.markdown("- **RSI** aşırı satım bölgesinde (30 altı), bu genellikle tepki alımı geleceğine işaret edebilir.")
-        elif input_data['rsi'].values[0] > 70:
-            st.markdown("- **RSI** aşırı alım bölgesinde (70 üstü), düzeltme gelebilir.")
 
 
 # Tarama tablolarında sayıların tutarlı ondalıkla gösterimi (örn. 1.9 yerine 1.90)

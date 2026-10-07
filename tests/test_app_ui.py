@@ -4,10 +4,12 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 import pytest
+import xgboost
 import yfinance
 from streamlit.testing.v1 import AppTest
 
 import config
+import explain
 import features
 
 APP_PATH = str(Path(__file__).resolve().parents[1] / "app.py")
@@ -76,10 +78,9 @@ def test_app_renders_a_single_prediction_without_error(patched_download):
     assert list(at.exception) == []
     assert not any("Bir hata oluştu" in e.value for e in at.error)
 
-    # Tam olarak bir yön kutusu render edilmeli: yukarı (success) ya da düşüş (error).
-    assert len(at.success) + len(at.error) == 1
+    # Yön kutusu ve güven skoru, sinyalin rengini taşıyan iki kutu olarak render edilmeli.
+    assert len(at.success) + len(at.warning) + len(at.error) == 2
     assert len(at.metric) == 1
-    assert len(at.info) == 1
 
 
 def test_app_uses_most_recent_trading_day_for_prediction(patched_download):
@@ -97,6 +98,115 @@ def test_app_uses_most_recent_trading_day_for_prediction(patched_download):
         expected.reset_index(drop=True),
         check_exact=False,
     )
+
+
+def _plotly_charts(at):
+    return at.get("plotly_chart")
+
+
+def test_explanation_replaces_static_rsi_rules(patched_download):
+    """Fikstürde RSI 100'dür; eski kural tabanlı metin "aşırı alım" basardı."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    texts = [m.value for m in at.markdown]
+    assert not any("aşırı alım" in t or "aşırı satım" in t for t in texts)
+    assert any("tahminini" in t for t in texts)
+
+
+def test_explanation_matches_model_contributions(patched_download):
+    """UI'daki özet, aynı satır için modelin gerçek TreeSHAP katkılarıyla tutarlı olmalı."""
+    model = xgboost.XGBClassifier()
+    model.load_model(config.MODEL_PATH)
+    row = _expected_last_row(patched_download)[model.get_booster().feature_names]
+    explanation, _ = explain.explain_prediction(model, row)
+    expected_summary = explain.summarize_drivers(explanation, "AKBNK")
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert expected_summary in [m.value for m in at.markdown]
+
+
+def test_explanation_renders_contribution_waterfall(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    # Fiyat grafiği + katkı şelale grafiği
+    assert len(_plotly_charts(at)) == 2
+
+
+@pytest.fixture
+def fixed_probability(monkeypatch):
+    """Modelin artış olasılığını sabitler; UI'ın sinyal etiketlemesini
+    eğitilmiş modelden bağımsız test etmeyi sağlar."""
+    def _set(prob):
+        monkeypatch.setattr(
+            xgboost.XGBClassifier, "predict_proba",
+            lambda self, X: np.array([[1.0 - prob, prob]]),
+        )
+    return _set
+
+
+def _boxes(at):
+    return {
+        "success": [e.value for e in at.success],
+        "warning": [e.value for e in at.warning],
+        "error": [e.value for e in at.error],
+    }
+
+
+@pytest.mark.parametrize(
+    "prob, kind, label",
+    [
+        (0.60, "success", "YÜKSELİŞ"),
+        (0.50, "warning", "NÖTR"),
+        (0.40, "error", "DÜŞÜŞ"),
+    ],
+)
+def test_direction_and_confidence_share_signal_color(patched_download, fixed_probability, prob, kind, label):
+    fixed_probability(prob)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    boxes = _boxes(at)
+    # Yön kutusu ve güven skoru aynı renkte (aynı türde) render edilmeli
+    assert len(boxes[kind]) == 2
+    assert any(label in v for v in boxes[kind])
+    assert any(f"%{prob * 100:.1f}" in v for v in boxes[kind])
+    assert sum(len(v) for v in boxes.values()) == 2
+
+
+@pytest.mark.parametrize("prob", [0.49, 0.50, 0.51])
+def test_coin_flip_probabilities_render_as_neutral(patched_download, fixed_probability, prob):
+    fixed_probability(prob)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert any("NÖTR" in e.value for e in at.warning)
+    assert not any("YÜKSELİŞ" in e.value for e in at.success)
+    assert not any("DÜŞÜŞ" in e.value for e in at.error)
+
+
+def test_min_confidence_slider_widens_neutral_band(patched_download, fixed_probability):
+    fixed_probability(0.56)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    slider = at.sidebar.slider[0]
+    assert slider.value == pytest.approx(0.53)
+    assert any("YÜKSELİŞ" in e.value for e in at.success)
+
+    slider.set_value(0.60).run()
+
+    assert list(at.exception) == []
+    assert any("NÖTR" in e.value for e in at.warning)
+    assert not at.success
 
 
 def test_app_market_scanner_tab_triggers_and_renders(patched_download):
