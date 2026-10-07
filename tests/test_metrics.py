@@ -50,3 +50,13 @@ def test_class_distribution():
 
 def test_class_distribution_includes_missing_class():
     assert metrics.class_distribution([1, 1]) == {0: 0.0, 1: 1.0}
+
+
+def test_scale_pos_weight_is_negative_to_positive_ratio():
+    assert metrics.scale_pos_weight([1, 1, 1, 0]) == pytest.approx(1 / 3)
+    assert metrics.scale_pos_weight([0, 0, 1]) == pytest.approx(2.0)
+
+
+def test_scale_pos_weight_falls_back_to_one_for_single_class():
+    assert metrics.scale_pos_weight([1, 1]) == 1.0
+    assert metrics.scale_pos_weight([0, 0]) == 1.0

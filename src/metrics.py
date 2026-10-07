@@ -39,3 +39,16 @@ def class_distribution(y):
     if len(y) == 0:
         return {0: 0.0, 1: 0.0}
     return {label: float(np.mean(y == label)) for label in (0, 1)}
+
+
+def scale_pos_weight(y):
+    """
+    XGBoost'un scale_pos_weight değeri: düşüş günü sayısı / yükseliş günü sayısı.
+    Tek sınıf varsa ağırlıklandırma anlamsızdır, 1.0 döner.
+    """
+    y = np.asarray(y)
+    n_pos = int(np.sum(y == 1))
+    n_neg = int(np.sum(y == 0))
+    if n_pos == 0 or n_neg == 0:
+        return 1.0
+    return n_neg / n_pos
