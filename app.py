@@ -5,7 +5,7 @@ import xgboost as xgb
 import yfinance as yf
 import ta
 import plotly.graph_objects as go
-from src import config, features, scanner
+from src import config, features, scanner, signals
 import os
 
 # Sayfa Ayarları
@@ -25,6 +25,17 @@ selected_ticker = st.sidebar.selectbox(
     format_func=lambda x: f"{x} (TRALT)" if x == "KOZAL" else (f"{x} (TRMET)" if x == "KOZAA" else x)
 )
 selected_ticker_full = selected_ticker + ".IS"
+
+st.sidebar.header("Sinyal Ayarları")
+min_confidence = st.sidebar.slider(
+    "Minimum Güven Eşiği",
+    min_value=0.51,
+    max_value=0.70,
+    value=config.PROB_THRESHOLD_HIGH,
+    step=0.01,
+    help="Olasılık bu eşiğin üzerinde (ya da 1 - eşik altında) değilse sinyal nötr gösterilir.",
+)
+prob_low, prob_high = signals.symmetric_band(min_confidence)
 
 # Model Yükleme
 @st.cache_resource
@@ -97,7 +108,6 @@ try:
         st.error("Model dosyası bulunamadı! Lütfen önce `src/model_train.py` çalıştırın.")
     else:
         model = load_model()
-
         tab1, tab2 = st.tabs(["🎯 Tek Hisse Analizi", "📊 BIST 30 Fırsat Radarı"])
 
         with tab1:
@@ -114,7 +124,13 @@ try:
                 
                 # Tahmin
                 prob = model.predict_proba(X_pred)[0][1] # Artış olasılığı
-                prediction = 1 if prob > 0.5 else 0
+                signal = signals.classify_signal(prob, prob_low, prob_high)
+                # Sinyale göre renkli kutu: yeşil (yükseliş), sarı (nötr), kırmızı (düşüş)
+                signal_box, signal_label = {
+                    signals.UP: (st.success, "**YÜKSELİŞ BEKLENTİSİ** 🚀"),
+                    signals.NEUTRAL: (st.warning, "**NÖTR / BELİRSİZ PİYASA** ⏸️"),
+                    signals.DOWN: (st.error, "**DÜŞÜŞ / ZAYIF TREND** 🔻"),
+                }[signal]
                 
                 # GÖSTERGE PANELİ
                 col1, col2, col3 = st.columns(3)
@@ -142,14 +158,11 @@ try:
                     
                 with col2:
                     st.write("🤖 **Modelin Yarınki Tahmini:**") # Başlık ekledik ki karışmasın
-                    if prediction == 1:
-                        st.success(f"YÖN: **YUKARI** 🚀")
-                    else:
-                        st.error(f"YÖN: **DÜŞÜŞ / YATAY** 🔻")
+                    signal_box(signal_label)
                 
                 with col3:
                     st.write("📊 **Güven Skoru:**")
-                    st.info(f"%{prob*100:.1f} Olasılıkla")
+                    signal_box(f"%{prob*100:.1f} Olasılıkla Yükseliş")
 
                 # GRAFİK KISMI (Candlestick)
                 st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği")
