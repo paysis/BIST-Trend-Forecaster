@@ -70,3 +70,11 @@ def test_train_model_reports_imbalance_aware_metrics(small_dataset, capsys):
 def test_train_model_tunes_for_selected_metric(small_dataset, capsys):
     model_train.train_model(tune=True, n_trials=2, metric="roc_auc")
     assert "En iyi CV skoru (roc_auc)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("use_tune", [False, True])
+def test_train_model_applies_class_weight(small_dataset, use_tune, capsys):
+    model, _ = model_train.train_model(tune=use_tune, n_trials=2, balance_classes=True)
+    weight = model.get_params()["scale_pos_weight"]
+    assert weight is not None and weight > 0
+    assert "scale_pos_weight=" in capsys.readouterr().out
