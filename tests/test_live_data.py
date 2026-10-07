@@ -62,6 +62,25 @@ def test_fetch_live_frame_downloads_mapped_symbol(monkeypatch):
     assert requested == ["TRMET.IS"]
 
 
+def test_live_frame_has_six_months_of_indicators_for_backtest(monkeypatch):
+    """Göstergelerin ısınma süresinden (sma_50) sonra en az 6 aylık satır kalmalı."""
+    months = {"3mo": 3, "6mo": 6, "1y": 12, "2y": 24}
+    end = pd.Timestamp("2026-10-06")
+
+    def fake_download(ticker, period, **kwargs):
+        dates = pd.bdate_range(end - pd.DateOffset(months=months[period]), end)
+        close = 100.0 + np.arange(len(dates)) * 0.1
+        return pd.DataFrame(
+            {"Close": close, "High": close + 1, "Low": close - 1, "Open": close, "Volume": 1e6},
+            index=pd.Index(dates, name="Date"),
+        )
+
+    monkeypatch.setattr(yfinance, "download", fake_download)
+
+    df_processed, _ = live_data.fetch_live_frame("AKBNK.IS")
+    assert df_processed["Date"].min() <= end - pd.DateOffset(months=6)
+
+
 @pytest.mark.parametrize("multiindex_ticker", [None, "AKBNK.IS"])
 def test_prepare_live_frame_drops_partial_rows_without_prices(multiindex_ticker):
     """Yahoo seans sonrası bazen günün satırını OHLC'si boş, yalnızca hacmi dolu
