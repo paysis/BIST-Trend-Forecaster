@@ -169,3 +169,35 @@ def test_top_and_bottom_order():
     assert bull["ticker_code"].tolist() == ["T0.IS", "T1.IS", "T2.IS", "T3.IS", "T4.IS"]
     # Düşüş listesi en düşük olasılıktan başlamalı
     assert bear["ticker_code"].tolist() == ["T29.IS", "T28.IS", "T27.IS", "T26.IS", "T25.IS"]
+
+
+def test_scan_market_retries_batch_after_transient_error(monkeypatch, dummy_model, fake_panel):
+    tickers = ["AKBNK.IS", "GARAN.IS"]
+    healthy = batch_download(lambda sym: fake_panel.copy())
+    attempts = []
+
+    def flaky(tickers_arg, *args, **kwargs):
+        attempts.append(tickers_arg)
+        if len(attempts) == 1:
+            raise ConnectionError("ağ hatası")
+        return healthy(tickers_arg, *args, **kwargs)
+
+    monkeypatch.setattr(yfinance, "download", flaky)
+
+    df_scan, failed = scanner.scan_market(tickers, dummy_model)
+
+    assert len(attempts) == 2
+    assert failed == []
+    assert len(df_scan) == 2
+
+
+def test_scan_market_marks_all_failed_when_yahoo_unreachable(monkeypatch, dummy_model):
+    def download(*args, **kwargs):
+        raise ConnectionError("ağ hatası")
+
+    monkeypatch.setattr(yfinance, "download", download)
+
+    df_scan, failed = scanner.scan_market(["AKBNK.IS", "GARAN.IS"], dummy_model)
+
+    assert df_scan.empty
+    assert failed == ["AKBNK.IS", "GARAN.IS"]
