@@ -65,3 +65,8 @@ def test_train_model_reports_imbalance_aware_metrics(small_dataset, capsys):
     assert "Test Sınıf Dağılımı" in out
     for label in ("Dengeli Doğruluk", "ROC-AUC", "Log Loss"):
         assert label in out
+
+
+def test_train_model_tunes_for_selected_metric(small_dataset, capsys):
+    model_train.train_model(tune=True, n_trials=2, metric="roc_auc")
+    assert "En iyi CV skoru (roc_auc)" in capsys.readouterr().out

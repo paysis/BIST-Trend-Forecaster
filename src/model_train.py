@@ -38,7 +38,7 @@ def get_temporal_split(df_processed, features_list, train_ratio=0.9):
     return X_train, X_test, y_train, y_test, dates_train, cutoff_date
 
 
-def train_model(tune=False, n_trials=50):
+def train_model(tune=False, n_trials=50, metric='accuracy'):
     # 1. Veriyi Yükle
     print("Veri yükleniyor...")
     df = pd.read_csv(config.DATA_PATH)
@@ -75,9 +75,9 @@ def train_model(tune=False, n_trials=50):
     # Varsayılan: manuel parametreler. --tune ile Optuna optimizasyonu yapılır.
     params = dict(tune_module.DEFAULT_PARAMS)
     if tune:
-        print(f"Optuna ile hiperparametre optimizasyonu ({n_trials} deneme)...")
-        study = tune_module.run_study(X_train, y_train, dates_train, n_trials=n_trials)
-        print(f"En iyi CV doğruluğu: {study.best_value:.4f}")
+        print(f"Optuna ile hiperparametre optimizasyonu ({n_trials} deneme, hedef: {metric})...")
+        study = tune_module.run_study(X_train, y_train, dates_train, n_trials=n_trials, metric=metric)
+        print(f"En iyi CV skoru ({metric}): {study.best_value:.4f}")
         print(f"En iyi parametreler: {study.best_params}")
         params = study.best_params
 
@@ -117,5 +117,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BIST XGBoost model eğitimi")
     parser.add_argument("--tune", action="store_true", help="Optuna ile hiperparametre optimizasyonu yap")
     parser.add_argument("--n-trials", type=int, default=50, help="Optuna deneme sayısı")
+    parser.add_argument("--metric", choices=tune_module.METRICS, default="accuracy",
+                        help="Optuna'nın maksimize edeceği CV metriği")
     args = parser.parse_args()
-    train_model(tune=args.tune, n_trials=args.n_trials)
+    train_model(tune=args.tune, n_trials=args.n_trials, metric=args.metric)
