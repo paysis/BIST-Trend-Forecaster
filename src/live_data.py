@@ -1,8 +1,7 @@
 # src/live_data.py - Yahoo Finance'ten canlı veri çekip modele hazırlayan ortak yardımcılar
 # (Tek hisse analizi ve BIST 30 taraması aynı işlem hattını kullanır.)
 import pandas as pd
-import yfinance as yf
-from src import config, features
+from src import config, features, network
 
 # Modelin indikatörleri hesaplayabilmesi için son 6 ayın verisine ihtiyacı var
 LIVE_PERIOD = "6mo"
@@ -65,5 +64,5 @@ def prepare_live_frame(raw, ticker):
 
 def fetch_live_frame(ticker):
     """Tek bir hisse için canlı veriyi indirip prepare_live_frame ile hazırlar."""
-    raw = yf.download(yahoo_symbol(ticker), period=LIVE_PERIOD, progress=False)
+    raw = network.download_with_retry(yahoo_symbol(ticker), period=LIVE_PERIOD, progress=False)
     return prepare_live_frame(raw, ticker)
