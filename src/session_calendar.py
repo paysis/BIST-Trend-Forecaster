@@ -6,8 +6,10 @@ tahmin yapılan bir sonraki işlem seansını belirler, Türkçe tarih
 formatında kullanıcı arayüzüne sunar.
 """
 from dataclasses import dataclass
-from datetime import datetime
 import pandas as pd
+
+# Hafta sonu kontrolü sunucu saatine göre değil, borsanın saatine göre yapılır
+BIST_TZ = "Europe/Istanbul"
 
 TURKISH_DAYS = {
     0: "Pazartesi",
@@ -38,7 +40,7 @@ TURKISH_MONTHS = {
 def _normalize_date(dt) -> pd.Timestamp:
     ts = pd.to_datetime(dt)
     if getattr(ts, "tzinfo", None) is not None:
-        ts = ts.tz_localize(None)
+        ts = ts.tz_convert(BIST_TZ).tz_localize(None)
     return ts.normalize()
 
 
@@ -76,14 +78,9 @@ def get_session_info(last_date, now=None) -> SessionInfo:
     last_ts = _normalize_date(last_date)
     next_ts = get_next_trading_session(last_ts)
 
-    if now is None:
-        now_dt = datetime.now()
-    elif isinstance(now, (str, pd.Timestamp)):
-        now_dt = _normalize_date(now).to_pydatetime()
-    else:
-        now_dt = now
+    now_ts = _normalize_date(pd.Timestamp.now(tz=BIST_TZ) if now is None else now)
 
-    is_wknd = now_dt.weekday() >= 5  # 5: Cumartesi, 6: Pazar
+    is_wknd = now_ts.weekday() >= 5  # 5: Cumartesi, 6: Pazar
 
     last_str = format_turkish_date(last_ts)
     next_str = format_turkish_date(next_ts)
