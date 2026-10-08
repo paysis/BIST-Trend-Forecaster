@@ -436,3 +436,27 @@ def test_app_renders_model_metadata_in_sidebar(patched_download):
     assert any("Sürüm:" in t for t in sidebar_texts)
     assert any("Test Doğruluğu:" in t for t in sidebar_texts)
 
+
+@pytest.fixture
+def counted_download(monkeypatch):
+    """Tek sembol isteklerini sayan sahte yf.download; önbellek isabetini ölçmek için."""
+    panel = _fake_download_panel()
+    calls = []
+
+    def download(tickers, *args, **kwargs):
+        calls.append(tickers)
+        return panel.copy()
+
+    monkeypatch.setattr(yfinance, "download", download)
+    return calls
+
+
+def test_rerun_with_same_ticker_is_served_from_cache(counted_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert counted_download == ["AKBNK.IS"]
+
+    at.sidebar.slider[0].set_value(0.60).run()
+
+    assert list(at.exception) == []
+    assert counted_download == ["AKBNK.IS"]
