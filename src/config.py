@@ -32,3 +32,19 @@ END_DATE = "2025-12-08" # Bugüne kadar
 # prob >= HIGH -> yükseliş, prob <= LOW -> düşüş, arası -> nötr / belirsiz
 PROB_THRESHOLD_HIGH = 0.53
 PROB_THRESHOLD_LOW = 0.47
+
+# Modelin girdi olarak kullandığı teknik göstergeler ve takvim öznitelikleri (Single Source of Truth)
+FEATURES = [
+    "rsi",
+    "macd",
+    "sma_10",
+    "sma_50",
+    "bb_width",
+    "volatility",
+    "lag_1_ret",
+    "lag_2_ret",
+    "vol_change",
+    "day_of_week",
+    "month",
+]
+

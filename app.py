@@ -66,11 +66,7 @@ def render_single_ticker_tab():
         input_data = df_processed.iloc[[-1]]
 
         # Gerekli Featurelar
-        features_list = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width', 
-                         'volatility', 'lag_1_ret', 'lag_2_ret', 'vol_change', 
-                         'day_of_week', 'month']
-
-        X_pred = input_data[features_list]
+        X_pred = input_data[config.FEATURES]
 
         # Tahmin
         prob = model.predict_proba(X_pred)[0][1] # Artış olasılığı
@@ -157,7 +153,7 @@ def render_single_ticker_tab():
         st.write("Son günün teknik verileri:")
         st.dataframe(input_data[['rsi', 'macd', 'sma_10', 'sma_50', 'volatility']])
 
-        render_backtest(model, df_processed[['Date', 'close'] + features_list])
+        render_backtest(model, df_processed[['Date', 'close'] + config.FEATURES])
 
 
 BACKTEST_MONTHS = 6
