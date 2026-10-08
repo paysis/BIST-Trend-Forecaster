@@ -1,7 +1,7 @@
 # tests/test_session_calendar.py - BIST seans takvimi ve tarih formatlama testleri
 from datetime import datetime
+
 import pandas as pd
-import pytest
 
 from src import session_calendar
 

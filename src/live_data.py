@@ -1,6 +1,7 @@
 # src/live_data.py - Yahoo Finance'ten canlı veri çekip modele hazırlayan ortak yardımcılar
 # (Tek hisse analizi ve BIST 30 taraması aynı işlem hattını kullanır.)
 import pandas as pd
+
 from src import config, features, network
 
 # İndikatörlerin ısınması (sma_50) sonrası 6 aylık backtest için son 1 yılın verisi çekilir

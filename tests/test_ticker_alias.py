@@ -1,5 +1,4 @@
 # tests/test_ticker_alias.py - sembol eşleme ve boş veri doğrulama testleri
-from pathlib import Path
 import pandas as pd
 import pytest
 import yfinance

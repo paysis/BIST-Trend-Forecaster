@@ -1,21 +1,21 @@
 # app.py
-import streamlit as st
+import os
+
 import pandas as pd
-import xgboost as xgb
-import ta
 import plotly.graph_objects as go
+import streamlit as st
+import xgboost as xgb
+
 from src import (
     backtest,
     config,
     explain,
-    features,
     live_data,
     model_metadata,
     scanner,
     session_calendar,
     signals,
 )
-import os
 
 # Sayfa Ayarları
 st.set_page_config(page_title="BIST Hisse Yön Tahmini", layout="wide")

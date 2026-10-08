@@ -7,6 +7,7 @@ formatında kullanıcı arayüzüne sunar.
 """
 
 from dataclasses import dataclass
+
 import pandas as pd
 
 # Hafta sonu kontrolü sunucu saatine göre değil, borsanın saatine göre yapılır

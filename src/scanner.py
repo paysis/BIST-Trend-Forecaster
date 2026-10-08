@@ -1,6 +1,7 @@
 # src/scanner.py
 # BIST 30 hisselerinin tamamını modelden geçirip fırsat radarı sıralaması oluşturan modül
 import pandas as pd
+
 from src import config, live_data, network
 
 

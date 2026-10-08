@@ -1,11 +1,10 @@
 # tests/test_scanner.py - scanner.py birim testleri
-import pandas as pd
 import numpy as np
+import pandas as pd
 import pytest
-import xgboost as xgb
 import yfinance
 
-from src import scanner, config
+from src import scanner
 
 
 @pytest.fixture

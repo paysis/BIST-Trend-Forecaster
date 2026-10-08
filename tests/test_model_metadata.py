@@ -1,8 +1,8 @@
 # tests/test_model_metadata.py - Model meta-veri kayıt ve okuma birim testleri
-import json
 import os
 import subprocess
 import sys
+
 import pandas as pd
 import pytest
 import xgboost as xgb

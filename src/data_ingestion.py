@@ -1,8 +1,10 @@
 # src/data_ingestion.py
+import os
+
 import pandas as pd
+
 import config
 import network
-import os
 
 
 def fetch_data():

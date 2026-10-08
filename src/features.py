@@ -1,6 +1,6 @@
 # src/features.py
-import pandas as pd  # type: ignore
 import numpy as np  # type: ignore
+import pandas as pd  # type: ignore
 import ta  # type: ignore  # Technical Analysis Library
 
 
