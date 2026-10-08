@@ -27,76 +27,13 @@ def add_features(df, drop_incomplete_target=True):
 
     # Canlı tahmin veya tek hisse analizinde groupby genel giderini atlayıp
     # doğrudan seriler üzerinde vektörize hesaplama yapılır (#14)
-    if 'ticker' in df.columns and df['ticker'].nunique() == 1:
-        close = df['close']
-        volume = df['volume']
-
-        # 1. RSI
-        df['rsi'] = ta.momentum.rsi(close, window=14)
-
-        # 2. MACD
-        df['macd'] = ta.trend.macd_diff(close)
-
-        # 3. Hareketli Ortalamalar
-        df['sma_10'] = ta.trend.sma_indicator(close, window=10)
-        df['sma_50'] = ta.trend.sma_indicator(close, window=50)
-
-        # 4. Bollinger Bands
-        df['bb_width'] = ta.volatility.bollinger_wband(close)
-
-        # 5. Volatilite
-        df['volatility'] = close.rolling(10).std()
-
-        # 6. Lag Features
-        # pct_change bazen 0'a bölünme yüzünden inf üretebilir, bunu aşağıda temizleyeceğiz
-        df['pct_change'] = close.pct_change()
-        df['lag_1_ret'] = df['pct_change'].shift(1)
-        df['lag_2_ret'] = df['pct_change'].shift(2)
-
-        # 7. Tarihsel Özellikler
-        df['day_of_week'] = df['Date'].dt.dayofweek
-        df['month'] = df['Date'].dt.month
-
-        # 8. Hacim Değişimi
-        df['vol_change'] = volume.pct_change()
-
-        # Target
-        df['next_close'] = close.shift(-1)
-        df['target'] = (df['next_close'] > close).astype(int)
+    if df['ticker'].nunique() == 1:
+        new_cols = _ticker_features(df)
     else:
-        # Çoklu hisse senetleri için her hisse bağımsız gruplanarak hesaplanır
-        # 1. RSI
-        df['rsi'] = df.groupby('ticker')['close'].transform(lambda x: ta.momentum.rsi(x, window=14))
-
-        # 2. MACD
-        df['macd'] = df.groupby('ticker')['close'].transform(lambda x: ta.trend.macd_diff(x))
-
-        # 3. Hareketli Ortalamalar
-        df['sma_10'] = df.groupby('ticker')['close'].transform(lambda x: ta.trend.sma_indicator(x, window=10))
-        df['sma_50'] = df.groupby('ticker')['close'].transform(lambda x: ta.trend.sma_indicator(x, window=50))
-
-        # 4. Bollinger Bands
-        df['bb_width'] = df.groupby('ticker')['close'].transform(lambda x: ta.volatility.bollinger_wband(x))
-
-        # 5. Volatilite
-        df['volatility'] = df.groupby('ticker')['close'].transform(lambda x: x.rolling(10).std())
-
-        # 6. Lag Features
-        # pct_change bazen 0'a bölünme yüzünden inf üretebilir, bunu aşağıda temizleyeceğiz
-        df['pct_change'] = df.groupby('ticker')['close'].pct_change()
-        df['lag_1_ret'] = df.groupby('ticker')['pct_change'].shift(1)
-        df['lag_2_ret'] = df.groupby('ticker')['pct_change'].shift(2)
-
-        # 7. Tarihsel Özellikler
-        df['day_of_week'] = df['Date'].dt.dayofweek
-        df['month'] = df['Date'].dt.month
-
-        # 8. Hacim Değişimi
-        df['vol_change'] = df.groupby('ticker')['volume'].pct_change()
-
-        # Target
-        df['next_close'] = df.groupby('ticker')['close'].shift(-1)
-        df['target'] = (df['next_close'] > df['close']).astype(int)
+        # Çoklu hisse senetleri için her hisse bağımsız olarak hesaplanır
+        new_cols = pd.concat(_ticker_features(group)
+                             for _, group in df.groupby('ticker', sort=False))
+    df = pd.concat([df, new_cols], axis=1)
 
     # --- KRİTİK DÜZELTME ---
     # 1. Sonsuz değerleri (inf, -inf) NaN (boş) değere çevir
@@ -113,3 +50,44 @@ def add_features(df, drop_incomplete_target=True):
     # -----------------------
 
     return df
+
+
+def _ticker_features(df):
+    """Tek bir hissenin tarihe göre sıralı verisinden indikatör ve hedef
+    sütunlarını hesaplar; yalnızca yeni sütunları döndürür."""
+    close = df['close']
+    out = {}
+
+    # 1. RSI
+    out['rsi'] = ta.momentum.rsi(close, window=14)
+
+    # 2. MACD
+    out['macd'] = ta.trend.macd_diff(close)
+
+    # 3. Hareketli Ortalamalar
+    out['sma_10'] = ta.trend.sma_indicator(close, window=10)
+    out['sma_50'] = ta.trend.sma_indicator(close, window=50)
+
+    # 4. Bollinger Bands
+    out['bb_width'] = ta.volatility.bollinger_wband(close)
+
+    # 5. Volatilite
+    out['volatility'] = close.rolling(10).std()
+
+    # 6. Lag Features
+    # pct_change bazen 0'a bölünme yüzünden inf üretebilir, add_features bunu temizler
+    out['pct_change'] = close.pct_change()
+    out['lag_1_ret'] = out['pct_change'].shift(1)
+    out['lag_2_ret'] = out['pct_change'].shift(2)
+
+    # 7. Tarihsel Özellikler
+    out['day_of_week'] = df['Date'].dt.dayofweek
+    out['month'] = df['Date'].dt.month
+
+    # 8. Hacim Değişimi
+    out['vol_change'] = df['volume'].pct_change()
+
+    # Target
+    out['next_close'] = close.shift(-1)
+    out['target'] = (out['next_close'] > close).astype(int)
+    return pd.DataFrame(out, index=df.index)
