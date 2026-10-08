@@ -56,3 +56,25 @@ def test_shipped_model_still_loads():
     model = xgb.XGBClassifier()
     model.load_model(config.MODEL_PATH)
     assert model.n_features_in_ == len(FEATURES)
+
+
+def test_train_model_reports_imbalance_aware_metrics(small_dataset, capsys):
+    model_train.train_model()
+    out = capsys.readouterr().out
+    assert "Eğitim Sınıf Dağılımı" in out
+    assert "Test Sınıf Dağılımı" in out
+    for label in ("Dengeli Doğruluk", "ROC-AUC", "Log Loss"):
+        assert label in out
+
+
+def test_train_model_tunes_for_selected_metric(small_dataset, capsys):
+    model_train.train_model(tune=True, n_trials=2, metric="roc_auc")
+    assert "En iyi CV skoru (roc_auc)" in capsys.readouterr().out
+
+
+@pytest.mark.parametrize("use_tune", [False, True])
+def test_train_model_applies_class_weight(small_dataset, use_tune, capsys):
+    model, _ = model_train.train_model(tune=use_tune, n_trials=2, balance_classes=True)
+    weight = model.get_params()["scale_pos_weight"]
+    assert weight is not None and weight > 0
+    assert "scale_pos_weight=" in capsys.readouterr().out

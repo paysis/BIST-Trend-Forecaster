@@ -53,7 +53,13 @@ Finansal piyasalarda bireysel yatırımcılar genellikle teknik analiz yapmakta 
     cd src
     python model_train.py                        # manuel parametreler
     python model_train.py --tune --n-trials 50   # Optuna ile optimizasyon
+    python model_train.py --tune --metric roc_auc # CV hedefi: accuracy | balanced_accuracy | roc_auc
+    python model_train.py --balance-classes      # sınıf oranına göre scale_pos_weight
     ```
+
+### Değerlendirme Metrikleri
+*   Doğruluk tek başına yanıltıcıdır: çoğunluk sınıfını tahmin eden bir model yüksek doğruluk alır ama hiçbir şey öğrenmemiş olur. Bu yüzden `model_train.py`, eğitim/test setlerinin sınıf dağılımını loglar ve doğruluğun yanında **Dengeli Doğruluk (Balanced Accuracy)**, **ROC-AUC**, **Log Loss** ve **Kesinlik (Precision)** değerlerini raporlar (`src/metrics.py`).
+*   `--balance-classes`, yükseliş/düşüş oranı dengesizleştiğinde XGBoost'un `scale_pos_weight` parametresini eğitim etiketlerinden hesaplar; Optuna CV'sinde her kat kendi eğitim etiketlerini kullanır.
 
 ### Testler
 Geliştirme ve test bağımlılıklarını kurup testleri çalıştırabilirsiniz:
@@ -63,8 +69,8 @@ pytest -q
 ```
 
 ### Model Performansı
-*   **Doğruluk (Accuracy):** %55 - %60 bandında.
-    *   *Yorum:* Finansal piyasaların stokastik yapısı göz önüne alındığında, %50 üzerindeki her oran istatistiksel bir avantaj (edge) sağlar.
+*   **Test Seti (varsayılan parametreler, kesim 2025-02-25):** Doğruluk 0.511, Dengeli Doğruluk 0.511, ROC-AUC 0.513, Log Loss 0.698. Test setindeki yükseliş günü oranı %49.4'tür.
+    *   *Yorum:* Finansal piyasaların stokastik yapısı göz önüne alındığında sinyal zayıftır; ROC-AUC'nin 0.5'e yakın olması tahminlerin çoğunun yazı-tura seviyesinde olduğunu gösterir. Bu nedenle arayüzde nötr eşik bandı kullanılır.
 *   **Önemli Öznitelikler:** Model kararlarında en çok `day_of_week` (haftanın günü), `month` (ay) ve `vol_change` (hacim değişimi) etkili olmuştur.
 
 ## 4. İş Gereksinimleri ve Kullanım
@@ -83,6 +89,7 @@ BIST-TREND-FORECASTER/
 │   ├── features.py     # İndikatör hesaplamaları
 │   ├── scanner.py      # BIST 30 piyasa taraması ve fırsat radarı
 │   ├── tune.py         # Optuna hiperparametre optimizasyonu
+│   ├── metrics.py      # Değerlendirme metrikleri ve sınıf ağırlıklandırma
 │   └── model_train.py  # Eğitim scripti
 ├── tests/              # Birim ve entegrasyon testleri
 ├── app.py              # Streamlit arayüz kodu
