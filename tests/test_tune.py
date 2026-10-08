@@ -1,8 +1,11 @@
 # tests/test_tune.py - tune.py birim testleri
 import numpy as np
 import optuna
+import pandas as pd
 import pytest
+import xgboost as xgb
 
+import metrics
 import tune
 
 
@@ -88,3 +91,63 @@ def test_run_study_is_reproducible_with_seed(synthetic_data):
     b = tune.run_study(X, y, dates, n_trials=3, n_splits=2, seed=7)
     assert a.best_params == b.best_params
     assert a.best_value == pytest.approx(b.best_value)
+
+
+@pytest.mark.parametrize("metric", tune.METRICS)
+def test_objective_supports_each_metric(synthetic_data, metric):
+    X, y, dates = synthetic_data
+    objective = tune.make_objective(X, y, dates, n_splits=2, metric=metric)
+    study = optuna.create_study(direction="maximize")
+    study.enqueue_trial({"n_estimators": 50, "max_depth": 2, "min_child_weight": 1})
+    score = objective(study.ask())
+    assert 0.6 < score <= 1.0
+
+
+def test_objective_rejects_unknown_metric(synthetic_data):
+    X, y, dates = synthetic_data
+    with pytest.raises(ValueError, match="metric"):
+        tune.make_objective(X, y, dates, metric="f1")
+
+
+def test_run_study_records_metric(synthetic_data):
+    X, y, dates = synthetic_data
+    study = tune.run_study(X, y, dates, n_trials=2, n_splits=2, metric="roc_auc")
+    assert study.user_attrs["metric"] == "roc_auc"
+
+
+@pytest.fixture
+def imbalanced_data():
+    """%80 yükseliş günü, zayıf sinyal: ağırlıksız model çoğunluk sınıfına kayar."""
+    rng = np.random.default_rng(1)
+    n = 3000
+    X = pd.DataFrame(rng.normal(size=(n, 4)), columns=["f0", "f1", "f2", "f3"])
+    y = pd.Series((X["f0"] + rng.normal(scale=1.5, size=n) > -1.6).astype(int))
+    return X, y
+
+
+def test_class_weight_params(imbalanced_data):
+    _, y = imbalanced_data
+    assert tune.class_weight_params(y, balance=False) == {}
+    weight = tune.class_weight_params(y, balance=True)["scale_pos_weight"]
+    assert weight == pytest.approx((y == 0).sum() / (y == 1).sum())
+
+
+def test_class_weighting_counters_majority_class_bias(imbalanced_data):
+    X, y = imbalanced_data
+    X_tr, y_tr, X_te, y_te = X[:2000], y[:2000], X[2000:], y[2000:]
+
+    def fit_score(balance):
+        model = xgb.XGBClassifier(**tune.DEFAULT_PARAMS, **tune.FIXED_PARAMS,
+                                  **tune.class_weight_params(y_tr, balance))
+        model.fit(X_tr, y_tr)
+        return metrics.evaluate(y_te, model.predict_proba(X_te)[:, 1])
+
+    plain, balanced = fit_score(False), fit_score(True)
+    assert balanced["balanced_accuracy"] > plain["balanced_accuracy"] + 0.03
+
+
+def test_run_study_with_class_balancing(synthetic_data):
+    X, y, dates = synthetic_data
+    study = tune.run_study(X, y, dates, n_trials=2, n_splits=2, balance_classes=True)
+    assert study.user_attrs["balance_classes"] is True
+    assert 0.0 <= study.best_value <= 1.0
