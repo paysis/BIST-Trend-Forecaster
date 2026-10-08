@@ -4,6 +4,7 @@ import pandas as pd
 import pytest
 import xgboost as xgb
 
+import config
 from explain import FEATURE_LABELS, explain_prediction, summarize_drivers, top_drivers
 
 
@@ -116,9 +117,7 @@ def test_top_drivers_ignores_zero_impact():
 
 
 def test_every_model_feature_has_a_readable_label():
-    model_features = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width', 'volatility',
-                      'lag_1_ret', 'lag_2_ret', 'vol_change', 'day_of_week', 'month']
-    assert set(model_features) <= set(FEATURE_LABELS)
+    assert set(config.FEATURES) <= set(FEATURE_LABELS)
 
 
 def test_summary_names_upward_and_downward_drivers_with_percent_impact():

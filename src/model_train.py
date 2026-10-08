@@ -50,12 +50,8 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
     
     # 3. Eğitim Seti Hazırlığı
     # Geleceği görmeyi engellemek için tarihsel kesim yapıyoruz (TimeSeries Split mantığı)
-    features_list = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width', 
-                     'volatility', 'lag_1_ret', 'lag_2_ret', 'vol_change', 
-                     'day_of_week', 'month']
-    
     X_train, X_test, y_train, y_test, dates_train, cutoff_date = get_temporal_split(
-        df_processed, features_list, train_ratio=0.9
+        df_processed, config.FEATURES, train_ratio=0.9
     )
     
     cutoff_str = pd.to_datetime(cutoff_date).strftime('%Y-%m-%d')
@@ -105,7 +101,7 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
     print(classification_report(y_test, preds))
     
     # Feature Importance (PDF Maddesi: Model Evaluation)
-    importance = dict(zip(features_list, model.feature_importances_))
+    importance = dict(zip(config.FEATURES, model.feature_importances_))
     print("\nÖnem Düzeyleri:")
     for k, v in sorted(importance.items(), key=lambda item: item[1], reverse=True):
         print(f"{k}: {v:.4f}")
@@ -123,7 +119,7 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
         test_rows=len(X_test),
         test_accuracy=acc,
         metrics=scores,
-        features=features_list,
+        features=config.FEATURES,
         best_params=params,
         version="1.0",
     )

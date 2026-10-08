@@ -402,6 +402,31 @@ def test_unreachable_yahoo_shows_friendly_warning_instead_of_error(monkeypatch):
     assert any("bağlantı sorunu" in w.value for w in at.warning)
 
 
+def test_app_renders_session_calendar_caption(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    assert any("Analiz Edilen Son Kapanış" in c.value and "Hedef Seans" in c.value for c in at.caption)
+
+
+def test_app_renders_weekend_notice_on_weekends(patched_download, monkeypatch):
+    import src.session_calendar as sc
+
+    orig_get_info = sc.get_session_info
+
+    def fake_get_info(last_date, now=None):
+        return orig_get_info(last_date, now=pd.Timestamp("2026-10-03 12:00:00"))  # Cumartesi
+
+    monkeypatch.setattr(sc, "get_session_info", fake_get_info)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    assert any("Hafta Sonu Bildirimi" in i.value for i in at.info)
+
+
 def test_app_renders_model_metadata_in_sidebar(patched_download):
     at = AppTest.from_file(APP_PATH, default_timeout=30)
     at.run()
