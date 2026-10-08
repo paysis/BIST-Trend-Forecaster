@@ -35,3 +35,14 @@ def synthetic_data():
     X = pd.DataFrame(rng.normal(size=(len(dates), 4)), columns=["f0", "f1", "f2", "f3"])
     y = pd.Series((X["f0"] + rng.normal(scale=0.5, size=len(X)) > 0).astype(int))
     return X, y, pd.Series(dates)
+
+
+@pytest.fixture(autouse=True)
+def no_retry_delay(monkeypatch):
+    """Yahoo isteklerindeki üstel geri çekilme beklemelerini testlerde atlar.
+    src/ altındaki betikler modülü 'network' olarak, uygulama 'src.network'
+    olarak yükler; ikisi ayrı modül nesneleridir."""
+    import network
+    from src import network as src_network
+    for module in (network, src_network):
+        monkeypatch.setattr(module, "_sleep", lambda seconds: None)

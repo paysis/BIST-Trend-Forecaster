@@ -316,3 +316,17 @@ def test_scanner_tables_use_consistent_number_formats(patched_download):
         assert formats["Son Fiyat (TL)"] == "%.2f"
         assert formats["Günlük Değişim (%)"] == "%.2f"
         assert formats["Yükseliş Olasılığı (%)"] == "%.1f"
+
+
+def test_unreachable_yahoo_shows_friendly_warning_instead_of_error(monkeypatch):
+    def download(*args, **kwargs):
+        raise ConnectionError("Max retries exceeded")
+
+    monkeypatch.setattr(yfinance, "download", download)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    assert list(at.error) == []
+    assert any("bağlantı sorunu" in w.value for w in at.warning)

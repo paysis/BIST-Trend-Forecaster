@@ -1,8 +1,7 @@
 # src/scanner.py
 # BIST 30 hisselerinin tamamını modelden geçirip fırsat radarı sıralaması oluşturan modül
 import pandas as pd
-import yfinance as yf
-from src import live_data
+from src import live_data, network
 
 
 def predict_single_ticker(ticker, model):
@@ -82,10 +81,14 @@ def scan_market(tickers, model):
     symbols = {ticker: live_data.yahoo_symbol(ticker) for ticker in tickers}
     batch = None
     if symbols:
-        batch = yf.download(
-            sorted(set(symbols.values())), period=live_data.LIVE_PERIOD,
-            group_by="ticker", progress=False,
-        )
+        try:
+            batch = network.download_with_retry(
+                sorted(set(symbols.values())), period=live_data.LIVE_PERIOD,
+                group_by="ticker", progress=False,
+            )
+        except network.MarketDataUnavailableError:
+            # Yahoo'ya ulaşılamadı: tüm hisseler verisi alınamayanlar listesine düşer
+            batch = None
     for ticker, symbol in symbols.items():
         try:
             df_processed, df = live_data.prepare_live_frame(_symbol_frame(batch, symbol), ticker)
