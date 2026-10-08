@@ -84,7 +84,6 @@ def test_get_session_info_on_sunday_includes_notice():
     assert "5 Ekim 2026, Pazartesi" in info.next_session_str
 
 
-
 def test_get_session_info_uses_istanbul_time_for_weekend_check():
     # UTC'de hâlâ Cuma 22:30, İstanbul'da Cumartesi 01:30
     friday_night_utc = pd.Timestamp("2026-10-02 22:30", tz="UTC")

@@ -23,9 +23,9 @@ def test_get_prediction_data_uses_mapped_ticker(monkeypatch):
         requested_tickers.append(ticker)
         # 120 günlük sahte veri dön
         dates = pd.bdate_range("2025-01-01", periods=120)
-        return pd.DataFrame({
-            "Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.5, "Volume": 1000.0
-        }, index=dates)
+        return pd.DataFrame(
+            {"Open": 10.0, "High": 11.0, "Low": 9.0, "Close": 10.5, "Volume": 1000.0}, index=dates
+        )
 
     monkeypatch.setattr(yfinance, "download", fake_download)
 
