@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import sys
+import pandas as pd
 import pytest
 import xgboost as xgb
 
@@ -98,3 +99,26 @@ def test_training_script_entry_point_imports_cleanly():
         cwd=root, capture_output=True, text=True, timeout=120,
     )
     assert result.returncode == 0, result.stderr
+
+
+@pytest.mark.skipif(not (os.path.exists(config.MODEL_PATH) and os.path.exists(config.DATA_PATH)),
+                    reason="model dosyası veya veri seti yok")
+def test_shipped_metadata_matches_measured_test_scores():
+    """Arayüzde gösterilen skorlar, gönderilen modelin zamansal test kesitindeki
+    gerçek ölçümleriyle aynı olmalıdır."""
+    import features
+    import metrics
+    import model_train
+
+    meta = model_metadata.load_metadata(config.MODEL_META_PATH)
+    model = xgb.XGBClassifier()
+    model.load_model(config.MODEL_PATH)
+    processed = features.add_features(pd.read_csv(config.DATA_PATH))
+    X_train, X_test, _, y_test, _, cutoff = model_train.get_temporal_split(processed, meta["features"])
+    scores = metrics.evaluate(y_test, model.predict_proba(X_test)[:, 1])
+
+    assert meta["data_cutoff_date"] == pd.to_datetime(cutoff).strftime("%Y-%m-%d")
+    assert (meta["train_rows"], meta["test_rows"]) == (len(X_train), len(X_test))
+    assert meta["test_accuracy"] == round(scores["accuracy"], 4)
+    for name, value in meta["metrics"].items():
+        assert value == round(scores[name], 4), name
