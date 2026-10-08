@@ -3,8 +3,8 @@
 import pandas as pd
 from src import config, features, network
 
-# Modelin indikatörleri hesaplayabilmesi için son 6 ayın verisine ihtiyacı var
-LIVE_PERIOD = "6mo"
+# İndikatörlerin ısınması (sma_50) sonrası 6 aylık backtest için son 1 yılın verisi çekilir
+LIVE_PERIOD = "1y"
 
 
 def yahoo_symbol(ticker):
