@@ -89,3 +89,10 @@ def test_train_model_writes_metadata_next_to_model(small_dataset, tmp_path):
     assert meta is not None
     assert meta["test_accuracy"] == round(acc, 4)
     assert meta["features"] == model.get_booster().feature_names
+
+
+def test_untuned_training_records_default_params_in_metadata(small_dataset):
+    model_train.train_model(tune=False)
+
+    meta = model_metadata.load_metadata(config.MODEL_META_PATH)
+    assert meta["best_params"] == tune.DEFAULT_PARAMS

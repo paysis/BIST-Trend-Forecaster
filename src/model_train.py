@@ -124,7 +124,7 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
         test_accuracy=acc,
         metrics=scores,
         features=features_list,
-        best_params=params if tune else None,
+        best_params=params,
         version="1.0",
     )
     model_metadata.save_metadata(meta, config.MODEL_META_PATH)
