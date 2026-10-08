@@ -5,6 +5,7 @@ import os
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_PATH = os.path.join(BASE_DIR, "data", "bist30_combined.csv")
 MODEL_PATH = os.path.join(BASE_DIR, "models", "xgb_bist_model.json")
+MODEL_META_PATH = os.path.join(BASE_DIR, "models", "xgb_bist_model_meta.json")
 
 # BIST 30 Hisseleri (Likiditesi yüksek, manipülasyonu zor)
 TICKERS = [

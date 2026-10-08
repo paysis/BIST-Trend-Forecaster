@@ -8,6 +8,7 @@ from sklearn.metrics import classification_report
 import config
 import features
 import metrics
+import model_metadata
 import tune as tune_module
 
 
@@ -105,12 +106,26 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
     for k, v in sorted(importance.items(), key=lambda item: item[1], reverse=True):
         print(f"{k}: {v:.4f}")
     
-    # 6. Modeli Kaydet
+    # 6. Modeli ve Meta-verisini Kaydet
     if not os.path.exists(os.path.dirname(config.MODEL_PATH)):
         os.makedirs(os.path.dirname(config.MODEL_PATH))
         
     model.save_model(config.MODEL_PATH)
     print(f"\n✅ Model kaydedildi: {config.MODEL_PATH}")
+
+    meta = model_metadata.build_metadata(
+        cutoff_date=cutoff_str,
+        train_rows=len(X_train),
+        test_rows=len(X_test),
+        test_accuracy=acc,
+        metrics=scores,
+        features=config.FEATURES,
+        best_params=params,
+        version="1.0",
+    )
+    model_metadata.save_metadata(meta, config.MODEL_META_PATH)
+    print(f"✅ Model meta-verisi kaydedildi: {config.MODEL_META_PATH}")
+
     return model, acc
 
 if __name__ == "__main__":
