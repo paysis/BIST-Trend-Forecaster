@@ -7,6 +7,7 @@ import xgboost as xgb
 
 import config
 import features
+import model_metadata
 import model_train
 import tune
 
@@ -26,6 +27,7 @@ def small_dataset(tmp_path, monkeypatch):
     df.to_csv(data_path, index=False)
     monkeypatch.setattr(config, "DATA_PATH", str(data_path))
     monkeypatch.setattr(config, "MODEL_PATH", str(tmp_path / "models" / "model.json"))
+    monkeypatch.setattr(config, "MODEL_META_PATH", str(tmp_path / "models" / "model_meta.json"))
     return df
 
 
@@ -78,3 +80,12 @@ def test_train_model_applies_class_weight(small_dataset, use_tune, capsys):
     weight = model.get_params()["scale_pos_weight"]
     assert weight is not None and weight > 0
     assert "scale_pos_weight=" in capsys.readouterr().out
+
+
+def test_train_model_writes_metadata_next_to_model(small_dataset, tmp_path):
+    model, acc = model_train.train_model()
+
+    meta = model_metadata.load_metadata(str(tmp_path / "models" / "model_meta.json"))
+    assert meta is not None
+    assert meta["test_accuracy"] == round(acc, 4)
+    assert meta["features"] == model.get_booster().feature_names
