@@ -460,3 +460,25 @@ def test_rerun_with_same_ticker_is_served_from_cache(counted_download):
 
     assert list(at.exception) == []
     assert counted_download == ["AKBNK.IS"]
+
+
+def test_refresh_data_button_refetches_selected_ticker(counted_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    at.sidebar.button(key="btn_refresh_data").click().run()
+
+    assert list(at.exception) == []
+    assert counted_download == ["AKBNK.IS", "AKBNK.IS"]
+
+
+def test_refresh_data_button_keeps_other_tickers_cached(counted_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.sidebar.selectbox[0].select("GARAN").run()
+    at.sidebar.button(key="btn_refresh_data").click().run()
+
+    at.sidebar.selectbox[0].select("AKBNK").run()
+
+    assert list(at.exception) == []
+    assert counted_download == ["AKBNK.IS", "GARAN.IS", "GARAN.IS"]

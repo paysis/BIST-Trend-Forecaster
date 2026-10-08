@@ -24,6 +24,14 @@ selected_ticker = st.sidebar.selectbox(
     format_func=lambda x: f"{x} (TRALT)" if x == "KOZAL" else (f"{x} (TRMET)" if x == "KOZAA" else x)
 )
 selected_ticker_full = selected_ticker + ".IS"
+# Veriler 15 dk önbellekte tutulur; buton yalnızca seçili hissenin kaydını
+# temizler, böylece sonraki çalıştırma Yahoo'dan taze veri çeker (#11)
+st.sidebar.button(
+    "🔄 Verileri Yenile",
+    key="btn_refresh_data",
+    help="Seçili hissenin verisini önbelleği atlayarak yeniden indirir.",
+    on_click=lambda: get_prediction_data.clear(selected_ticker_full),
+)
 
 st.sidebar.header("Sinyal Ayarları")
 min_confidence = st.sidebar.slider(
