@@ -7,9 +7,7 @@ import xgboost as xgb
 
 import config
 
-FEATURES = ['rsi', 'macd', 'sma_10', 'sma_50', 'bb_width',
-            'volatility', 'lag_1_ret', 'lag_2_ret', 'vol_change',
-            'day_of_week', 'month']
+FEATURES = config.FEATURES
 
 pytestmark = pytest.mark.skipif(not os.path.exists(config.MODEL_PATH), reason="model dosyası yok")
 
