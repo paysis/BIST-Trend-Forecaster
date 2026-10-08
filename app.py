@@ -4,7 +4,7 @@ import pandas as pd
 import xgboost as xgb
 import ta
 import plotly.graph_objects as go
-from src import backtest, config, explain, features, live_data, scanner, signals
+from src import backtest, config, explain, features, live_data, scanner, session_calendar, signals
 import os
 
 # Sayfa Ayarları
@@ -78,6 +78,12 @@ def render_single_ticker_tab():
             signals.DOWN: (st.error, "**DÜŞÜŞ / ZAYIF TREND** 🔻"),
         }[signal]
 
+        # Seans Takvimi Bilgilendirmesi (#16)
+        session_info = session_calendar.get_session_info(input_data['Date'].iloc[-1])
+        if session_info.weekend_notice:
+            st.info(session_info.weekend_notice)
+        st.caption(session_info.badge_text)
+
         # GÖSTERGE PANELİ
         col1, col2, col3 = st.columns(3)
 
@@ -103,7 +109,7 @@ def render_single_ticker_tab():
             )
 
         with col2:
-            st.write("🤖 **Modelin Yarınki Tahmini:**") # Başlık ekledik ki karışmasın
+            st.write(f"🤖 **Modelin Seans Tahmini ({session_info.next_session_str}):**")
             signal_box(signal_label)
 
         with col3:
