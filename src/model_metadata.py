@@ -9,8 +9,6 @@ import os
 from datetime import datetime, timezone
 from typing import Any, Dict, Optional
 
-from src import config
-
 
 def build_metadata(
     cutoff_date: str,
@@ -40,19 +38,19 @@ def build_metadata(
     }
 
 
-def save_metadata(metadata: Dict[str, Any], path: Optional[str] = None) -> str:
+def save_metadata(metadata: Dict[str, Any], path: str) -> str:
     """Metaveri sözlüğünü JSON dosyası olarak diske yazar."""
-    target_path = path or config.MODEL_META_PATH
+    target_path = path
     os.makedirs(os.path.dirname(target_path), exist_ok=True)
     with open(target_path, "w", encoding="utf-8") as f:
         json.dump(metadata, f, indent=2, ensure_ascii=False)
     return target_path
 
 
-def load_metadata(path: Optional[str] = None) -> Optional[Dict[str, Any]]:
-    """Varsayılan veya verilen yoldan model metaverisini yükler.
+def load_metadata(path: str) -> Optional[Dict[str, Any]]:
+    """Verilen yoldan model metaverisini yükler.
     Dosya yoksa veya bozuksa None döner."""
-    target_path = path or config.MODEL_META_PATH
+    target_path = path
     if not os.path.exists(target_path):
         return None
     try:

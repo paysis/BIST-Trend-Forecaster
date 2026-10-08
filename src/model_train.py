@@ -127,7 +127,7 @@ def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=Fals
         best_params=params if tune else None,
         version="1.0",
     )
-    model_metadata.save_metadata(meta)
+    model_metadata.save_metadata(meta, config.MODEL_META_PATH)
     print(f"✅ Model meta-verisi kaydedildi: {config.MODEL_META_PATH}")
 
     return model, acc

@@ -1,6 +1,8 @@
 # tests/test_model_metadata.py - Model meta-veri kayıt ve okuma birim testleri
 import json
 import os
+import subprocess
+import sys
 import pytest
 import xgboost as xgb
 
@@ -85,3 +87,14 @@ def test_shipped_model_metadata_is_valid():
     model = xgb.XGBClassifier()
     model.load_model(config.MODEL_PATH)
     assert meta["features"] == model.get_booster().feature_names
+
+
+def test_training_script_entry_point_imports_cleanly():
+    """model_train.py, src/ içinden betik olarak çalıştırılır; 'src' paketi
+    sys.path'te olmadığından modüller 'from src import ...' kullanmamalıdır."""
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    result = subprocess.run(
+        [sys.executable, os.path.join("src", "model_train.py"), "--help"],
+        cwd=root, capture_output=True, text=True, timeout=120,
+    )
+    assert result.returncode == 0, result.stderr

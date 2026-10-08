@@ -37,7 +37,7 @@ min_confidence = st.sidebar.slider(
 prob_low, prob_high = signals.symmetric_band(min_confidence)
 
 # Model Bilgisi (#13)
-model_meta = model_metadata.load_metadata()
+model_meta = model_metadata.load_metadata(config.MODEL_META_PATH)
 with st.sidebar.expander("ℹ️ Model Bilgisi", expanded=False):
     if model_meta:
         st.write(f"**Sürüm:** v{model_meta.get('version', '1.0')}")
