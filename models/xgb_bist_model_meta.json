@@ -1,0 +1,32 @@
+{
+  "version": "1.0",
+  "trained_at": "2025-12-10T18:52:00Z",
+  "data_cutoff_date": "2025-02-25",
+  "train_rows": 52190,
+  "test_rows": 5794,
+  "test_accuracy": 0.5512,
+  "metrics": {
+    "accuracy": 0.5512,
+    "balanced_accuracy": 0.5489,
+    "roc_auc": 0.5621,
+    "precision": 0.5580
+  },
+  "features": [
+    "rsi",
+    "macd",
+    "sma_10",
+    "sma_50",
+    "bb_width",
+    "volatility",
+    "lag_1_ret",
+    "lag_2_ret",
+    "vol_change",
+    "day_of_week",
+    "month"
+  ],
+  "best_params": {
+    "n_estimators": 100,
+    "max_depth": 5,
+    "learning_rate": 0.05
+  }
+}

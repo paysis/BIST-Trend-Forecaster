@@ -400,3 +400,14 @@ def test_unreachable_yahoo_shows_friendly_warning_instead_of_error(monkeypatch):
     assert list(at.exception) == []
     assert list(at.error) == []
     assert any("bağlantı sorunu" in w.value for w in at.warning)
+
+
+def test_app_renders_model_metadata_in_sidebar(patched_download):
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    assert list(at.exception) == []
+    sidebar_texts = [w.value for w in at.sidebar.get("markdown")]
+    assert any("Sürüm:" in t for t in sidebar_texts)
+    assert any("Test Doğruluğu:" in t for t in sidebar_texts)
+

@@ -4,7 +4,7 @@ import pandas as pd
 import xgboost as xgb
 import ta
 import plotly.graph_objects as go
-from src import backtest, config, explain, features, live_data, scanner, signals
+from src import backtest, config, explain, features, live_data, model_metadata, scanner, signals
 import os
 
 # Sayfa Ayarları
@@ -35,6 +35,20 @@ min_confidence = st.sidebar.slider(
     help="Olasılık bu eşiğin üzerinde (ya da 1 - eşik altında) değilse sinyal nötr gösterilir.",
 )
 prob_low, prob_high = signals.symmetric_band(min_confidence)
+
+# Model Bilgisi (#13)
+model_meta = model_metadata.load_metadata()
+with st.sidebar.expander("ℹ️ Model Bilgisi", expanded=False):
+    if model_meta:
+        st.write(f"**Sürüm:** v{model_meta.get('version', '1.0')}")
+        st.write(f"**Eğitim Kesimi:** {model_meta.get('data_cutoff_date', '-')}")
+        if 'test_accuracy' in model_meta:
+            st.write(f"**Test Doğruluğu:** %{model_meta['test_accuracy'] * 100:.1f}")
+        if 'metrics' in model_meta and 'roc_auc' in model_meta['metrics']:
+            st.write(f"**ROC-AUC:** {model_meta['metrics']['roc_auc']:.3f}")
+        st.write(f"**Öznitelik Sayısı:** {len(model_meta.get('features', []))}")
+    else:
+        st.write("Model meta-verisi bulunamadı.")
 
 # Model Yükleme
 @st.cache_resource
