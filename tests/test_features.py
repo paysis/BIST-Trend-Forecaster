@@ -65,3 +65,23 @@ def test_keeping_incomplete_target_does_not_change_earlier_rows(ohlcv_dataset):
         kept_processed[kept_processed["Date"] <= common_dates].reset_index(drop=True),
         default_processed.reset_index(drop=True),
     )
+
+
+def test_empty_dataframe_returns_empty():
+    assert add_features(pd.DataFrame()).empty
+
+
+def test_single_ticker_vectorized_matches_multi_ticker_exact(ohlcv_dataset):
+    """Tek hisse için çalışan hızlı yol, çoklu hisse groupby mantığıyla
+    bit-seviyesinde bire bir aynı değerleri üretmelidir (#14)."""
+    single = ohlcv_dataset[ohlcv_dataset["ticker"] == "AKBNK"].copy().reset_index(drop=True)
+
+    # Tekil hisse ile çalıştırıldığında optimize yol tetiklenir
+    fast_result = add_features(single, drop_incomplete_target=False).reset_index(drop=True)
+
+    # Çoklu hisse veri seti içinde aynı AKBNK satırlarını çıkar
+    multi_result = add_features(ohlcv_dataset, drop_incomplete_target=False)
+    multi_akbnk = multi_result[multi_result["ticker"] == "AKBNK"].reset_index(drop=True)
+
+    pd.testing.assert_frame_equal(fast_result, multi_akbnk)
+
