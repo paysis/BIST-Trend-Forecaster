@@ -4,9 +4,10 @@ import os
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-from sklearn.metrics import accuracy_score, classification_report
+from sklearn.metrics import classification_report
 import config
 import features
+import metrics
 import tune as tune_module
 
 
@@ -37,7 +38,7 @@ def get_temporal_split(df_processed, features_list, train_ratio=0.9):
     return X_train, X_test, y_train, y_test, dates_train, cutoff_date
 
 
-def train_model(tune=False, n_trials=50):
+def train_model(tune=False, n_trials=50, metric='accuracy', balance_classes=False):
     # 1. Veriyi Yükle
     print("Veri yükleniyor...")
     df = pd.read_csv(config.DATA_PATH)
@@ -66,26 +67,39 @@ def train_model(tune=False, n_trials=50):
     print(f"Tarih Kesimi (Cutoff): {cutoff_str}")
     print(f"Eğitim Verisi: {X_train.shape} (Tarih Aralığı: {train_start} - {train_end})")
     print(f"Test Verisi: {X_test.shape} (Tarih Aralığı: {test_start} - {test_end})")
+    for name, y_part in (("Eğitim", y_train), ("Test", y_test)):
+        dist = metrics.class_distribution(y_part)
+        print(f"{name} Sınıf Dağılımı: Yükseliş %{dist[1] * 100:.1f} / Düşüş %{dist[0] * 100:.1f}")
     
     # 4. Model Tanımlama ve Eğitim (XGBoost)
     # Varsayılan: manuel parametreler. --tune ile Optuna optimizasyonu yapılır.
     params = dict(tune_module.DEFAULT_PARAMS)
     if tune:
-        print(f"Optuna ile hiperparametre optimizasyonu ({n_trials} deneme)...")
-        study = tune_module.run_study(X_train, y_train, dates_train, n_trials=n_trials)
-        print(f"En iyi CV doğruluğu: {study.best_value:.4f}")
+        print(f"Optuna ile hiperparametre optimizasyonu ({n_trials} deneme, hedef: {metric})...")
+        study = tune_module.run_study(X_train, y_train, dates_train, n_trials=n_trials,
+                                      metric=metric, balance_classes=balance_classes)
+        print(f"En iyi CV skoru ({metric}): {study.best_value:.4f}")
         print(f"En iyi parametreler: {study.best_params}")
         params = study.best_params
 
-    model = xgb.XGBClassifier(**params, **tune_module.FIXED_PARAMS)
+    weight_params = tune_module.class_weight_params(y_train, balance_classes)
+    if weight_params:
+        print(f"Sınıf ağırlıklandırma: scale_pos_weight={weight_params['scale_pos_weight']:.4f}")
+    model = xgb.XGBClassifier(**params, **tune_module.FIXED_PARAMS, **weight_params)
     
     print("Model eğitiliyor...")
     model.fit(X_train, y_train)
     
     # 5. Değerlendirme
-    preds = model.predict(X_test)
-    acc = accuracy_score(y_test, preds)
+    proba = model.predict_proba(X_test)[:, 1]
+    preds = (proba >= 0.5).astype(int)
+    scores = metrics.evaluate(y_test, proba)
+    acc = scores['accuracy']
     print(f"\n🎯 Model Doğruluğu (Test Seti): {acc:.4f}")
+    print(f"Dengeli Doğruluk (Balanced Accuracy): {scores['balanced_accuracy']:.4f}")
+    print(f"ROC-AUC: {scores['roc_auc']:.4f}")
+    print(f"Log Loss: {scores['log_loss']:.4f}")
+    print(f"Kesinlik (Precision, Yükseliş): {scores['precision']:.4f}")
     print("\nSınıflandırma Raporu:")
     print(classification_report(y_test, preds))
     
@@ -107,5 +121,10 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="BIST XGBoost model eğitimi")
     parser.add_argument("--tune", action="store_true", help="Optuna ile hiperparametre optimizasyonu yap")
     parser.add_argument("--n-trials", type=int, default=50, help="Optuna deneme sayısı")
+    parser.add_argument("--metric", choices=tune_module.METRICS, default="accuracy",
+                        help="Optuna'nın maksimize edeceği CV metriği")
+    parser.add_argument("--balance-classes", action="store_true",
+                        help="Sınıf oranına göre scale_pos_weight ile ağırlıklandır")
     args = parser.parse_args()
-    train_model(tune=args.tune, n_trials=args.n_trials)
+    train_model(tune=args.tune, n_trials=args.n_trials, metric=args.metric,
+                balance_classes=args.balance_classes)

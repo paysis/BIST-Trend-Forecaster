@@ -44,6 +44,12 @@ def test_prepare_live_frame_rejects_missing_data(raw):
         live_data.prepare_live_frame(raw, "AKBNK.IS")
 
 
+def test_missing_data_message_suggests_retrying_later():
+    """yfinance ağ kesintilerini boş veri olarak döndürür; mesaj bu durumu da kapsamalı."""
+    with pytest.raises(ValueError, match="birkaç dakika sonra tekrar deneyin"):
+        live_data.prepare_live_frame(pd.DataFrame(), "AKBNK.IS")
+
+
 def test_prepare_live_frame_rejects_too_short_history():
     with pytest.raises(ValueError, match="yetersiz"):
         live_data.prepare_live_frame(_raw_panel(n_days=20), "AKBNK.IS")
@@ -97,3 +103,29 @@ def test_prepare_live_frame_drops_partial_rows_without_prices(multiindex_ticker)
     assert ohlcv["Date"].iloc[-1] == raw.index[-2]
     # Fiyat metriği, grafik ve tahmin aynı son tam işlem gününü kullanmalı
     assert processed["Date"].iloc[-1] == ohlcv["Date"].iloc[-1]
+
+
+def test_fetch_live_frame_recovers_from_transient_network_errors(monkeypatch):
+    outcomes = [ConnectionError("ağ hatası"), ConnectionError("ağ hatası"), _raw_panel()]
+    monkeypatch.setattr(yfinance, "download", lambda *args, **kwargs: _raise_or_return(outcomes.pop(0)))
+
+    df_processed, _ = live_data.fetch_live_frame("AKBNK.IS")
+
+    assert not df_processed.empty
+    assert outcomes == []
+
+
+def test_fetch_live_frame_reports_connection_problem_after_retries(monkeypatch):
+    def download(*args, **kwargs):
+        raise ConnectionError("ağ hatası")
+
+    monkeypatch.setattr(yfinance, "download", download)
+
+    with pytest.raises(ValueError, match="bağlantı sorunu"):
+        live_data.fetch_live_frame("AKBNK.IS")
+
+
+def _raise_or_return(outcome):
+    if isinstance(outcome, Exception):
+        raise outcome
+    return outcome

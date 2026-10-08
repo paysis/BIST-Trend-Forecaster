@@ -1,8 +1,7 @@
 # src/live_data.py - Yahoo Finance'ten canlı veri çekip modele hazırlayan ortak yardımcılar
 # (Tek hisse analizi ve BIST 30 taraması aynı işlem hattını kullanır.)
 import pandas as pd
-import yfinance as yf
-from src import config, features
+from src import config, features, network
 
 # İndikatörlerin ısınması (sma_50) sonrası 6 aylık backtest için son 1 yılın verisi çekilir
 LIVE_PERIOD = "1y"
@@ -24,7 +23,8 @@ def prepare_live_frame(raw, ticker):
     if raw is None or raw.empty:
         raise ValueError(
             f"'{ticker}' (Yahoo: '{yahoo_symbol(ticker)}') için piyasa verisi alınamadı. "
-            "Sembol değişmiş veya Yahoo Finance servisi yanıt vermiyor olabilir."
+            "Sembol değişmiş veya Yahoo Finance servisine geçici olarak ulaşılamıyor olabilir; "
+            "lütfen birkaç dakika sonra tekrar deneyin."
         )
 
     df = raw.copy()
@@ -65,5 +65,5 @@ def prepare_live_frame(raw, ticker):
 
 def fetch_live_frame(ticker):
     """Tek bir hisse için canlı veriyi indirip prepare_live_frame ile hazırlar."""
-    raw = yf.download(yahoo_symbol(ticker), period=LIVE_PERIOD, progress=False)
+    raw = network.download_with_retry(yahoo_symbol(ticker), period=LIVE_PERIOD, progress=False)
     return prepare_live_frame(raw, ticker)
