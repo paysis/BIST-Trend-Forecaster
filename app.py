@@ -22,7 +22,7 @@ st.set_page_config(page_title="BIST Hisse Yön Tahmini", layout="wide")
 
 st.title("📈 Borsa İstanbul Yapay Zeka Yön Tahmini")
 st.markdown("""
-Bu proje **XGBoost** algoritması kullanarak BIST 30 hisselerinin 
+Bu proje **XGBoost** algoritması kullanarak BIST 30 hisselerinin
 bir sonraki günkü kapanış yönünü (Artış/Düşüş) tahmin eder.
 """)
 
@@ -260,7 +260,8 @@ def render_backtest(model, df_processed):
         "aksi halde nakde geçer (getiri %0). "
         f"Hissede kalınan gün oranı: %{result.exposure * 100:.0f} · "
         f"Pozisyon değişikliği: {result.trades}. "
-        "Komisyon ve vergiler dahil değildir; geçmiş performans gelecekteki sonuçları garanti etmez."
+        "Komisyon ve vergiler dahil değildir; "
+        "geçmiş performans gelecekteki sonuçları garanti etmez."
     )
 
 
@@ -275,7 +276,7 @@ SCAN_COLUMN_CONFIG = {
 def render_market_scanner_tab():
     st.subheader("📊 BIST 30 Piyasa Fırsat Radarı")
     st.markdown("""
-    Bu modül BIST 30 endeksindeki tüm hisseleri yapay zeka modelinden geçirerek 
+    Bu modül BIST 30 endeksindeki tüm hisseleri yapay zeka modelinden geçirerek
     yarın için en yüksek yükseliş potansiyeline ve düşüş riskine sahip hisseleri sıralar.
     """)
 

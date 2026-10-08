@@ -8,14 +8,16 @@ import config
 
 
 def test_ticker_yahoo_map_contains_renamed_tickers():
-    """Kasım 2025'te değişen KOZAL (TRALT) ve KOZAA (TRMET) sembollerinin haritada olduğunu doğrular."""
+    """Kasım 2025'te değişen KOZAL (TRALT) ve KOZAA (TRMET) sembollerinin
+    haritada olduğunu doğrular."""
     assert hasattr(config, "TICKER_YAHOO_MAP")
     assert config.TICKER_YAHOO_MAP.get("KOZAL.IS") == "TRALT.IS"
     assert config.TICKER_YAHOO_MAP.get("KOZAA.IS") == "TRMET.IS"
 
 
 def test_get_prediction_data_uses_mapped_ticker(monkeypatch):
-    """get_prediction_data fonksiyonunun Yahoo Finance'e sorgu atarken haritadaki güncel sembolü kullandığını doğrular."""
+    """get_prediction_data fonksiyonunun Yahoo Finance'e sorgu atarken haritadaki
+    güncel sembolü kullandığını doğrular."""
     requested_tickers = []
 
     def fake_download(ticker, *args, **kwargs):

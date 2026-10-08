@@ -59,7 +59,8 @@ END_DATE = "2025-12-08"  # Bugüne kadar
 PROB_THRESHOLD_HIGH = 0.53
 PROB_THRESHOLD_LOW = 0.47
 
-# Modelin girdi olarak kullandığı teknik göstergeler ve takvim öznitelikleri (Single Source of Truth)
+# Modelin girdi olarak kullandığı teknik göstergeler ve takvim öznitelikleri
+# (Single Source of Truth)
 FEATURES = [
     "rsi",
     "macd",

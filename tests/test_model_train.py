@@ -51,7 +51,6 @@ def test_temporal_split_includes_all_tickers(multi_ticker_dataset):
     """Eski satır bazlı split alfabetik son hisseleri teste atıyordu.
     Tarih bazlı splitte her hissenin hem geçmişi hem geleceği olmalı."""
     features_list = ["f1", "f2"]
-    train_mask = multi_ticker_dataset["Date"] < multi_ticker_dataset["Date"].quantile(0.8)
 
     X_train, X_test, _, _, _, cutoff_date = get_temporal_split(
         multi_ticker_dataset, features_list, train_ratio=0.8
