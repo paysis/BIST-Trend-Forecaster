@@ -45,7 +45,7 @@ st.sidebar.button(
     on_click=lambda: get_prediction_data.clear(selected_ticker_full),
 )
 
-st.sidebar.header("Sinyal Ayarları")
+st.sidebar.header("Sinyal & Strateji Ayarları")
 min_confidence = st.sidebar.slider(
     "Minimum Güven Eşiği",
     min_value=0.51,
@@ -55,6 +55,18 @@ min_confidence = st.sidebar.slider(
     help="Olasılık bu eşiğin üzerinde (ya da 1 - eşik altında) değilse sinyal nötr gösterilir.",
 )
 prob_low, prob_high = signals.symmetric_band(min_confidence)
+
+commission_rate = st.sidebar.slider(
+    "Komisyon & Kayma Oranı (%)",
+    min_value=0.0,
+    max_value=0.50,
+    value=0.0,
+    help=(
+        "Pozisyon değişimlerinde (alım veya satım) düşülecek işlem maliyeti "
+        "(BIST ortalaması ~%0.10)."
+    ),
+)
+cost = commission_rate / 100.0
 
 # Model Bilgisi (#13)
 model_meta = model_metadata.load_metadata(config.MODEL_META_PATH)
@@ -226,18 +238,18 @@ def render_single_ticker_tab():
         st.write("Son günün teknik verileri:")
         st.dataframe(input_data[["rsi", "macd", "sma_10", "sma_50", "volatility"]])
 
-        render_backtest(model, df_processed[["Date", "close"] + config.FEATURES])
+        render_backtest(model, df_processed[["Date", "close"] + config.FEATURES], cost=cost)
 
 
 BACKTEST_MONTHS = 6
 
 
-def render_backtest(model, df_processed):
+def render_backtest(model, df_processed, cost=0.0):
     """Modelin yükseliş sinyallerini izleyen al/nakit stratejisini al-tut ile kıyaslar."""
     st.subheader(f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)")
     window = backtest.recent_window(df_processed, months=BACKTEST_MONTHS)
     probs = model.predict_proba(window.drop(columns=["Date", "close"]))[:, 1]
-    result = backtest.run_backtest(window, probs, threshold=prob_high)
+    result = backtest.run_backtest(window, probs, threshold=prob_high, cost=cost)
 
     fig = go.Figure()
     for column, name, color in (
@@ -264,6 +276,8 @@ def render_backtest(model, df_processed):
             "Toplam Getiri (%)": summary["total_return"] * 100,
             "Sharpe Oranı": summary["sharpe"],
             "Maks. Değer Kaybı (%)": summary["max_drawdown"] * 100,
+            "Kazanma Oranı (%)": summary["win_rate"] * 100,
+            "Kâr Faktörü": summary["profit_factor"],
         }
     )
     st.dataframe(
@@ -272,15 +286,22 @@ def render_backtest(model, df_processed):
             "Toplam Getiri (%)": st.column_config.NumberColumn(format="%.2f"),
             "Sharpe Oranı": st.column_config.NumberColumn(format="%.2f"),
             "Maks. Değer Kaybı (%)": st.column_config.NumberColumn(format="%.2f"),
+            "Kazanma Oranı (%)": st.column_config.NumberColumn(format="%.1f"),
+            "Kâr Faktörü": st.column_config.NumberColumn(format="%.2f"),
         },
+    )
+    cost_text = (
+        f"İşlem başına %{cost * 100:.2f} komisyon ve kayma maliyeti yansıtılmıştır · "
+        if cost > 0
+        else "Komisyon ve vergiler dahil değildir · "
     )
     st.caption(
         f"Strateji, yükseliş olasılığı %{prob_high * 100:.0f} ve üzerindeyken hissede kalır, "
         "aksi halde nakde geçer (getiri %0). "
         f"Hissede kalınan gün oranı: %{result.exposure * 100:.0f} · "
-        f"Pozisyon değişikliği: {result.trades}. "
-        "Komisyon ve vergiler dahil değildir; "
-        "geçmiş performans gelecekteki sonuçları garanti etmez."
+        f"Pozisyon değişikliği: {result.trades} · "
+        f"{cost_text}"
+        "Geçmiş performans gelecekteki sonuçları garanti etmez."
     )
 
 

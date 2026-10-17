@@ -82,3 +82,15 @@ def test_config_defines_sectors_for_all_tickers():
     assert config.get_ticker_sector("AKBNK.IS") == "Bankacılık"
     assert config.get_ticker_sector("AKBNK") == "Bankacılık"
     assert config.get_ticker_sector("UNKNOWN") == "Diğer"
+
+
+def test_small_dataset_isolates_both_config_namespaces(small_dataset, tmp_path):
+    import config as direct_config
+    from src import config as src_config
+
+    assert direct_config.DATA_PATH == src_config.DATA_PATH
+    assert direct_config.MODEL_PATH == src_config.MODEL_PATH
+    assert direct_config.MODEL_META_PATH == src_config.MODEL_META_PATH
+    assert str(tmp_path) in direct_config.DATA_PATH
+    assert str(tmp_path) in direct_config.MODEL_PATH
+    assert str(tmp_path) in direct_config.MODEL_META_PATH

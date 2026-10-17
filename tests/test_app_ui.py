@@ -251,7 +251,13 @@ def test_backtest_compares_model_strategy_with_buy_and_hold(patched_download):
 
     table = _backtest_table(at)
     assert list(table.index) == ["Model Stratejisi", "Al ve Tut"]
-    assert list(table.columns) == ["Toplam Getiri (%)", "Sharpe Oranı", "Maks. Değer Kaybı (%)"]
+    assert list(table.columns) == [
+        "Toplam Getiri (%)",
+        "Sharpe Oranı",
+        "Maks. Değer Kaybı (%)",
+        "Kazanma Oranı (%)",
+        "Kâr Faktörü",
+    ]
 
 
 def test_backtest_matches_buy_and_hold_when_always_bullish(patched_download, fixed_probability):
@@ -301,6 +307,25 @@ def test_backtest_caption_reports_exposure_and_trades(patched_download, fixed_pr
         "Hissede kalınan gün oranı: %100" in c.value and "Pozisyon değişikliği: 1" in c.value
         for c in at.caption
     )
+
+
+def test_backtest_commission_slider_reduces_net_return(patched_download, fixed_probability):
+    fixed_probability(0.60)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    table_gross = _backtest_table(at)
+    gross_return = table_gross.loc["Model Stratejisi", "Toplam Getiri (%)"]
+
+    # Komisyon slider'ı ayarlanır (0.20%)
+    at.sidebar.slider[1].set_value(0.20).run()
+
+    table_net = _backtest_table(at)
+    net_return = table_net.loc["Model Stratejisi", "Toplam Getiri (%)"]
+
+    assert net_return < gross_return
+    assert any("komisyon ve kayma maliyeti yansıtılmıştır" in c.value for c in at.caption)
 
 
 def test_app_market_scanner_tab_triggers_and_renders(patched_download):

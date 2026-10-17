@@ -48,12 +48,41 @@ def sharpe_ratio(returns, periods_per_year=TRADING_DAYS_PER_YEAR):
     return float(returns.mean() / std * np.sqrt(periods_per_year))
 
 
+def win_rate(returns):
+    """İşlem yapılan (sıfırdan farklı) günlerde pozitif getiri oranı. Aktif gün yoksa 0.0."""
+    returns = pd.Series(returns, dtype=float).dropna()
+    active = returns[returns != 0.0]
+    if len(active) == 0:
+        return 0.0
+    return float((active > 0).mean())
+
+
+def profit_factor(returns):
+    """Toplam kazanç / toplam kayıp oranı (gains / abs(losses)). Kayıp yoksa inf döner."""
+    returns = pd.Series(returns, dtype=float).dropna()
+    gains = float(returns[returns > 0].sum())
+    losses = float(abs(returns[returns < 0].sum()))
+    if losses == 0.0:
+        return float("inf") if gains > 0.0 else 0.0
+    return float(gains / losses)
+
+
 def summarize(returns):
-    """Toplam getiri, Sharpe oranı ve maksimum değer kaybı."""
+    """Toplam getiri, Sharpe oranı, maksimum değer kaybı, kazanma oranı ve kâr faktörü."""
+    if len(returns) == 0:
+        return {
+            "total_return": 0.0,
+            "sharpe": float("nan"),
+            "max_drawdown": 0.0,
+            "win_rate": 0.0,
+            "profit_factor": 0.0,
+        }
     return {
-        "total_return": float(cumulative_returns(returns).iloc[-1]) if len(returns) else 0.0,
+        "total_return": float(cumulative_returns(returns).iloc[-1]),
         "sharpe": sharpe_ratio(returns),
         "max_drawdown": max_drawdown(returns),
+        "win_rate": win_rate(returns),
+        "profit_factor": profit_factor(returns),
     }
 
 
@@ -65,6 +94,7 @@ class BacktestResult:
     buy_hold: dict
     exposure: float  # hissede geçirilen gün oranı
     trades: int  # pozisyon değişikliği sayısı (nakitten ilk giriş dahil)
+    cost: float = 0.0  # işlem başına komisyon ve kayma oranı
 
 
 def run_backtest(frame, probs, threshold, cost=0.0):
@@ -95,6 +125,7 @@ def run_backtest(frame, probs, threshold, cost=0.0):
         buy_hold=summarize(returns["buy_hold"]),
         exposure=float(realised.mean()),
         trades=trades,
+        cost=cost,
     )
 
 
