@@ -80,6 +80,33 @@ def test_summarize_reports_total_return_sharpe_drawdown():
     assert summary["total_return"] == pytest.approx(-0.01)
     assert summary["max_drawdown"] == pytest.approx(-0.10)
     assert summary["sharpe"] == pytest.approx(backtest.sharpe_ratio(returns))
+    assert summary["win_rate"] == pytest.approx(0.50)
+    assert summary["profit_factor"] == pytest.approx(1.0)
+
+
+def test_win_rate_calculates_positive_return_ratio_on_active_days():
+    assert backtest.win_rate(pd.Series([0.05, 0.02, 0.0, -0.01])) == pytest.approx(2 / 3)
+    assert backtest.win_rate(pd.Series([0.0, 0.0])) == 0.0
+    assert backtest.win_rate(pd.Series([0.01, 0.02])) == 1.0
+
+
+def test_profit_factor_calculates_gain_over_loss():
+    # 0.08 kazanç / 0.04 kayıp = 2.0
+    assert backtest.profit_factor(pd.Series([0.05, 0.03, -0.04])) == pytest.approx(2.0)
+    assert backtest.profit_factor(pd.Series([0.05, 0.02])) == float("inf")
+    assert backtest.profit_factor(pd.Series([0.0, 0.0])) == 0.0
+
+
+def test_run_backtest_with_cost_stores_cost_and_deducts_commission(close):
+    frame = pd.DataFrame({"Date": DATES, "close": close.values})
+    probs = np.array([0.60, 0.50, 0.60, 0.40])
+
+    result_gross = backtest.run_backtest(frame, probs, threshold=0.55, cost=0.0)
+    result_net = backtest.run_backtest(frame, probs, threshold=0.55, cost=0.002)
+
+    assert result_gross.cost == 0.0
+    assert result_net.cost == 0.002
+    assert result_net.strategy["total_return"] < result_gross.strategy["total_return"]
 
 
 def test_run_backtest_holds_only_on_up_signals(close):
