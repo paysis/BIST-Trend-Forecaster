@@ -310,6 +310,7 @@ SCAN_COLUMN_CONFIG = {
     "Son Fiyat (TL)": st.column_config.NumberColumn(format="%.2f"),
     "Günlük Değişim (%)": st.column_config.NumberColumn(format="%.2f"),
     "Yükseliş Olasılığı (%)": st.column_config.NumberColumn(format="%.1f"),
+    "Sektör": st.column_config.TextColumn("Sektör"),
 }
 
 
@@ -342,14 +343,32 @@ def render_market_scanner_tab():
             )
 
         if scan_df is not None and not scan_df.empty:
-            top_bull, top_bear = scanner.top_and_bottom(scan_df, n=5)
+            sectors = sorted(scan_df["Sektör"].dropna().unique())
+            selected_sectors = st.multiselect(
+                "Sektöre Göre Filtrele",
+                options=sectors,
+                default=[],
+                help="Belirli bir veya birden fazla sektördeki hisseleri listelemek için seçin.",
+            )
+
+            filtered_scan_df = (
+                scan_df[scan_df["Sektör"].isin(selected_sectors)] if selected_sectors else scan_df
+            )
+
+            top_bull, top_bear = scanner.top_and_bottom(filtered_scan_df, n=5)
 
             c1, c2 = st.columns(2)
             with c1:
                 st.markdown("### 🟢 En Yüksek Yükseliş Potansiyeli (Top 5)")
                 st.dataframe(
                     top_bull[
-                        ["Hisse", "Son Fiyat (TL)", "Günlük Değişim (%)", "Yükseliş Olasılığı (%)"]
+                        [
+                            "Hisse",
+                            "Sektör",
+                            "Son Fiyat (TL)",
+                            "Günlük Değişim (%)",
+                            "Yükseliş Olasılığı (%)",
+                        ]
                     ],
                     hide_index=True,
                     column_config=SCAN_COLUMN_CONFIG,
@@ -358,7 +377,13 @@ def render_market_scanner_tab():
                 st.markdown("### 🔴 Düşüş Riski En Yüksek (Top 5)")
                 st.dataframe(
                     top_bear[
-                        ["Hisse", "Son Fiyat (TL)", "Günlük Değişim (%)", "Yükseliş Olasılığı (%)"]
+                        [
+                            "Hisse",
+                            "Sektör",
+                            "Son Fiyat (TL)",
+                            "Günlük Değişim (%)",
+                            "Yükseliş Olasılığı (%)",
+                        ]
                     ],
                     hide_index=True,
                     column_config=SCAN_COLUMN_CONFIG,
@@ -366,9 +391,10 @@ def render_market_scanner_tab():
 
             st.markdown("### 📋 Tüm BIST 30 Liderlik Tablosu")
             st.dataframe(
-                scan_df[
+                filtered_scan_df[
                     [
                         "Hisse",
+                        "Sektör",
                         "Son Fiyat (TL)",
                         "Günlük Değişim (%)",
                         "Yükseliş Olasılığı (%)",

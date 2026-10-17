@@ -71,6 +71,19 @@ def test_add_features_produces_all_config_features():
         assert col in processed.columns
 
 
+def test_config_defines_sectors_for_all_tickers():
+    assert len(config.TICKER_SECTORS) >= len(config.TICKERS)
+    for t in config.TICKERS:
+        assert t in config.TICKER_SECTORS
+        assert isinstance(config.TICKER_SECTORS[t], str)
+        assert len(config.TICKER_SECTORS[t]) > 0
+
+    # Hem .IS hem de yalın sembol ile sektör sorgusu çalışmalı
+    assert config.get_ticker_sector("AKBNK.IS") == "Bankacılık"
+    assert config.get_ticker_sector("AKBNK") == "Bankacılık"
+    assert config.get_ticker_sector("UNKNOWN") == "Diğer"
+
+
 def test_small_dataset_isolates_both_config_namespaces(small_dataset, tmp_path):
     import config as direct_config
     from src import config as src_config
