@@ -67,6 +67,7 @@ def test_predict_single_ticker_success(monkeypatch, dummy_model, fake_panel):
     res = scanner.predict_single_ticker("AKBNK.IS", dummy_model)
     assert res is not None
     assert res["Hisse"] == "AKBNK"
+    assert res["Sektör"] == "Bankacılık"
     assert res["ticker_code"] == "AKBNK.IS"
     assert "Son Fiyat (TL)" in res
     assert "Günlük Değişim (%)" in res

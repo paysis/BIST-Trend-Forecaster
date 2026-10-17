@@ -69,3 +69,16 @@ def test_add_features_produces_all_config_features():
     processed = features.add_features(raw, drop_incomplete_target=False)
     for col in config.FEATURES:
         assert col in processed.columns
+
+
+def test_config_defines_sectors_for_all_tickers():
+    assert len(config.TICKER_SECTORS) >= len(config.TICKERS)
+    for t in config.TICKERS:
+        assert t in config.TICKER_SECTORS
+        assert isinstance(config.TICKER_SECTORS[t], str)
+        assert len(config.TICKER_SECTORS[t]) > 0
+
+    # Hem .IS hem de yalın sembol ile sektör sorgusu çalışmalı
+    assert config.get_ticker_sector("AKBNK.IS") == "Bankacılık"
+    assert config.get_ticker_sector("AKBNK") == "Bankacılık"
+    assert config.get_ticker_sector("UNKNOWN") == "Diğer"

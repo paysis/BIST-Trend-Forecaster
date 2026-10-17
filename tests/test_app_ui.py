@@ -319,8 +319,25 @@ def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     assert len(at.dataframe) >= 4
     leaderboard = at.dataframe[-1].value
     assert "Hisse" in leaderboard.columns
+    assert "Sektör" in leaderboard.columns
     assert "Yükseliş Olasılığı (%)" in leaderboard.columns
     assert len(leaderboard) == len(config.TICKERS)
+
+
+def test_app_market_scanner_sector_filter(patched_download):
+    """Fırsat Radarı sekmesinde sektörel filtreleme yapıldığında yalnızca
+    seçili sektörün hisselerinin listelendiğini doğrular."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    assert len(at.multiselect) >= 1
+    sector_filter = at.multiselect[0]
+    sector_filter.select("Bankacılık").run()
+
+    filtered_leaderboard = at.dataframe[-1].value
+    assert (filtered_leaderboard["Sektör"] == "Bankacılık").all()
+    assert len(filtered_leaderboard) < len(config.TICKERS)
 
 
 def test_cached_data_does_not_leak_between_tests_first(monkeypatch):
