@@ -50,6 +50,49 @@ TICKER_YAHOO_MAP = {
     "TRMET.IS": "TRMET.IS",
 }
 
+# BIST 30 hisseleri sektör eşlemesi
+TICKER_SECTORS = {
+    "AKBNK.IS": "Bankacılık",
+    "ARCLK.IS": "Dayanıklı Tüketim",
+    "ASELS.IS": "Savunma & Teknoloji",
+    "BIMAS.IS": "Perakende",
+    "EKGYO.IS": "Gayrimenkul",
+    "ENKAI.IS": "İnşaat & Taahhüt",
+    "EREGL.IS": "Demir-Çelik",
+    "FROTO.IS": "Otomotiv",
+    "GARAN.IS": "Bankacılık",
+    "GUBRF.IS": "Kimya & Gübre",
+    "HALKB.IS": "Bankacılık",
+    "HEKTS.IS": "Tarım & Kimya",
+    "ISCTR.IS": "Bankacılık",
+    "KCHOL.IS": "Holding",
+    "KOZAA.IS": "Madencilik",
+    "KOZAL.IS": "Madencilik",
+    "KRDMD.IS": "Demir-Çelik",
+    "PETKM.IS": "Petrokimya",
+    "PGSUS.IS": "Ulaştırma & Havacılık",
+    "SAHOL.IS": "Holding",
+    "SASA.IS": "Tekstil & Kimya",
+    "SISE.IS": "Cam & Sanayi",
+    "TCELL.IS": "Telekomünikasyon",
+    "THYAO.IS": "Ulaştırma & Havacılık",
+    "TKFEN.IS": "İnşaat & Taahhüt",
+    "TOASO.IS": "Otomotiv",
+    "TSKB.IS": "Bankacılık",
+    "TTKOM.IS": "Telekomünikasyon",
+    "TUPRS.IS": "Enerji & Petrol",
+    "YKBNK.IS": "Bankacılık",
+}
+
+
+def get_ticker_sector(ticker: str) -> str:
+    """Hissenin sektörünü döndürür (.IS eki olsa da olmasa da)."""
+    if ticker in TICKER_SECTORS:
+        return TICKER_SECTORS[ticker]
+    norm = ticker.replace(".IS", "").replace("=X", "") + ".IS"
+    return TICKER_SECTORS.get(norm, "Diğer")
+
+
 # Eğitim için kaç yıllık veri çekilsin?
 START_DATE = "2018-01-01"
 END_DATE = "2025-12-08"  # Bugüne kadar

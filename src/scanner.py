@@ -38,6 +38,7 @@ def _build_record(ticker, df_processed, df, model):
 
     return {
         "Hisse": clean_name,
+        "Sektör": config.get_ticker_sector(ticker),
         "ticker_code": ticker,
         "Son Fiyat (TL)": round(curr_price, 2),
         "Günlük Değişim (%)": round(change_rate, 2),
@@ -102,6 +103,7 @@ def scan_market(tickers, model, include_macro=False):
         return pd.DataFrame(
             columns=[
                 "Hisse",
+                "Sektör",
                 "ticker_code",
                 "Son Fiyat (TL)",
                 "Günlük Değişim (%)",

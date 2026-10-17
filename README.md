@@ -96,7 +96,16 @@ Farklı makine öğrenimi ve derin öğrenme mimarilerinin BIST 100 yön tahmini
 
 ## 4. İş Gereksinimleri ve Kullanım
 Bu model, bir yatırım tavsiyesi vermekten ziyade, yatırımcının karar destek mekanizması olarak tasarlanmıştır.
-*   **Canlıya Alma:** Model, `Streamlit` kullanılarak interaktif bir web arayüzüne dönüştürülmüştür.
+*   **Canlıya Alma (Streamlit):** Model, `Streamlit` kullanılarak interaktif bir web arayüzüne dönüştürülmüştür:
+    ```bash
+    streamlit run app.py
+    ```
+*   **Docker & Docker Compose ile Çalıştırma:**
+    Herhangi bir yerel ortam kurulumu yapmadan tek bir komutla uygulamayı konteyner üzerinde çalıştırabilirsiniz:
+    ```bash
+    docker compose up --build
+    ```
+    Uygulama `http://localhost:8501` adresinde yayına başlar.
 *   **İzleme (Monitoring):** Canlı ortamda modelin başarısı "Doğru Yön Tahmini Yüzdesi" metriği ile haftalık olarak takip edilmelidir.
 
 ## 5. Proje Yapısı
@@ -118,6 +127,9 @@ BIST-TREND-FORECASTER/
 │   └── model_train.py     # Model eğitimi ve kalite kapısı (quality gate)
 ├── tests/                 # Birim ve entegrasyon testleri
 ├── app.py                 # Streamlit arayüz kodu
+├── Dockerfile             # Docker konteyner tanımı
+├── docker-compose.yml     # Konteyner orchestration konfigürasyonu
+├── .dockerignore          # Docker imajı dışlama kuralları
 ├── requirements.txt       # Kütüphane bağımlılıkları (prod)
 ├── requirements-dev.txt   # Geliştirme ve test bağımlılıkları
 ├── pyproject.toml         # Proje meta verisi ve ruff ayarları

@@ -251,7 +251,13 @@ def test_backtest_compares_model_strategy_with_buy_and_hold(patched_download):
 
     table = _backtest_table(at)
     assert list(table.index) == ["Model Stratejisi", "Al ve Tut"]
-    assert list(table.columns) == ["Toplam Getiri (%)", "Sharpe Oranı", "Maks. Değer Kaybı (%)"]
+    assert list(table.columns) == [
+        "Toplam Getiri (%)",
+        "Sharpe Oranı",
+        "Maks. Değer Kaybı (%)",
+        "Kazanma Oranı (%)",
+        "Kâr Faktörü",
+    ]
 
 
 def test_backtest_matches_buy_and_hold_when_always_bullish(patched_download, fixed_probability):
@@ -303,6 +309,25 @@ def test_backtest_caption_reports_exposure_and_trades(patched_download, fixed_pr
     )
 
 
+def test_backtest_commission_slider_reduces_net_return(patched_download, fixed_probability):
+    fixed_probability(0.60)
+
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+
+    table_gross = _backtest_table(at)
+    gross_return = table_gross.loc["Model Stratejisi", "Toplam Getiri (%)"]
+
+    # Komisyon slider'ı ayarlanır (0.20%)
+    at.sidebar.slider[1].set_value(0.20).run()
+
+    table_net = _backtest_table(at)
+    net_return = table_net.loc["Model Stratejisi", "Toplam Getiri (%)"]
+
+    assert net_return < gross_return
+    assert any("komisyon ve kayma maliyeti yansıtılmıştır" in c.value for c in at.caption)
+
+
 def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     """Fırsat Radarı sekmesindeki 'BIST 30 Taramasını Başlat' butonuna basıldığında
     Top 5 Yükseliş, Top 5 Düşüş ve tüm BIST 30 tablolarının hatasız render edildiğini doğrular."""
@@ -319,8 +344,25 @@ def test_app_market_scanner_tab_triggers_and_renders(patched_download):
     assert len(at.dataframe) >= 4
     leaderboard = at.dataframe[-1].value
     assert "Hisse" in leaderboard.columns
+    assert "Sektör" in leaderboard.columns
     assert "Yükseliş Olasılığı (%)" in leaderboard.columns
     assert len(leaderboard) == len(config.TICKERS)
+
+
+def test_app_market_scanner_sector_filter(patched_download):
+    """Fırsat Radarı sekmesinde sektörel filtreleme yapıldığında yalnızca
+    seçili sektörün hisselerinin listelendiğini doğrular."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    at.button(key="btn_start_scan").click().run()
+
+    assert len(at.multiselect) >= 1
+    sector_filter = at.multiselect[0]
+    sector_filter.select("Bankacılık").run()
+
+    filtered_leaderboard = at.dataframe[-1].value
+    assert (filtered_leaderboard["Sektör"] == "Bankacılık").all()
+    assert len(filtered_leaderboard) < len(config.TICKERS)
 
 
 def test_cached_data_does_not_leak_between_tests_first(monkeypatch):

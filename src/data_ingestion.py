@@ -9,14 +9,8 @@ import config
 import network
 
 
-def fetch_data(start_date=None, end_date=None, output_path=None, include_macro=True):
-    start = start_date or config.START_DATE
-    end = end_date or config.END_DATE
-    out_path = output_path or config.DATA_PATH
-
-    print(f"Veri çekme işlemi başladı ({start} - {end})... Bu işlem biraz sürebilir.")
+def _download_ticker_frames(start, end, include_macro=True):
     all_data = []
-
     tickers = list(config.TICKERS)
     if include_macro:
         macro_tickers = getattr(config, "MACRO_TICKERS", [])
@@ -43,16 +37,135 @@ def fetch_data(start_date=None, end_date=None, output_path=None, include_macro=T
         except Exception as e:
             print(f"❌ {ticker} hatası: {e}")
 
+    return all_data
+
+
+def fetch_incremental(start_date=None, end_date=None, output_path=None, include_macro=True):
+    """Mevcut veri setindeki en son tarihi tespit ederek sadece eksik günleri indirir
+    ve mevcut CSV'ye ekler. Dosya yoksa veya bozuksa otomatik olarak tam indirmeye döner."""
+    out_path = output_path or config.DATA_PATH
+
+    if not os.path.exists(out_path):
+        print(f"Mevcut veri dosyası bulunamadı ({out_path}), tam indirmeye dönülüyor...")
+        return fetch_data(
+            start_date=start_date,
+            end_date=end_date,
+            output_path=out_path,
+            include_macro=include_macro,
+            incremental=False,
+        )
+
+    try:
+        existing_df = pd.read_csv(out_path)
+    except Exception as e:
+        print(f"Mevcut dosya okunamadı ({e}), tam indirmeye dönülüyor...")
+        return fetch_data(
+            start_date=start_date,
+            end_date=end_date,
+            output_path=out_path,
+            include_macro=include_macro,
+            incremental=False,
+        )
+
+    if existing_df.empty or "Date" not in existing_df.columns:
+        print("Mevcut veri setinde 'Date' sütunu bulunamadı, tam indirmeye dönülüyor...")
+        return fetch_data(
+            start_date=start_date,
+            end_date=end_date,
+            output_path=out_path,
+            include_macro=include_macro,
+            incremental=False,
+        )
+
+    date_series = pd.to_datetime(existing_df["Date"])
+    latest_date = date_series.max()
+    if pd.isna(latest_date):
+        print("Geçerli bir son tarih tespit edilemedi, tam indirmeye dönülüyor...")
+        return fetch_data(
+            start_date=start_date,
+            end_date=end_date,
+            output_path=out_path,
+            include_macro=include_macro,
+            incremental=False,
+        )
+
+    inc_start = (latest_date + pd.Timedelta(days=1)).strftime("%Y-%m-%d")
+    inc_end = end_date or config.END_DATE
+    if inc_end in ("today", "latest"):
+        inc_end = date.today().isoformat()
+
+    if inc_start > inc_end:
+        print(
+            f"Veri seti zaten güncel ({latest_date.strftime('%Y-%m-%d')}). Yeni indirme yapılmadı."
+        )
+        return existing_df
+
+    print(
+        f"Artımlı veri çekme başlatılıyor: {inc_start} -> {inc_end} "
+        f"(Mevcut son tarih: {latest_date.strftime('%Y-%m-%d')})"
+    )
+
+    new_data = _download_ticker_frames(inc_start, inc_end, include_macro=include_macro)
+    if not new_data:
+        print("Yeni veri bulunamadı.")
+        return existing_df
+
+    new_df = pd.concat(new_data, ignore_index=True)
+    new_df.columns = [c.lower() for c in new_df.columns]
+    new_df.rename(columns={"date": "Date"}, inplace=True)
+
+    combined_df = pd.concat([existing_df, new_df], ignore_index=True)
+    combined_df["Date"] = pd.to_datetime(combined_df["Date"]).dt.strftime("%Y-%m-%d")
+    combined_df.drop_duplicates(subset=["Date", "ticker"], keep="last", inplace=True)
+    combined_df.sort_values(by=["Date", "ticker"], inplace=True)
+
+    combined_df.to_csv(out_path, index=False)
+    print(
+        f"🎉 Artımlı güncelleme tamamlandı: {len(new_df)} yeni satır eklendi. "
+        f"Toplam Satır: {len(combined_df)}"
+    )
+    return combined_df
+
+
+def fetch_data(
+    start_date=None,
+    end_date=None,
+    output_path=None,
+    include_macro=True,
+    incremental=False,
+):
+    if incremental:
+        return fetch_incremental(
+            start_date=start_date,
+            end_date=end_date,
+            output_path=output_path,
+            include_macro=include_macro,
+        )
+
+    start = start_date or config.START_DATE
+    end = end_date or config.END_DATE
+    out_path = output_path or config.DATA_PATH
+
+    print(f"Veri çekme işlemi başladı ({start} - {end})... Bu işlem biraz sürebilir.")
+    all_data = _download_ticker_frames(start, end, include_macro=include_macro)
+
+    if not all_data:
+        print("Hiçbir hisse verisi çekilemedi.")
+        return pd.DataFrame()
+
     # Tüm hisseleri alt alta birleştir
     final_df = pd.concat(all_data, ignore_index=True)
 
     # Sütun isimlerini düzenle
     final_df.columns = [c.lower() for c in final_df.columns]
     final_df.rename(columns={"date": "Date"}, inplace=True)
+    final_df["Date"] = pd.to_datetime(final_df["Date"]).dt.strftime("%Y-%m-%d")
+    final_df.sort_values(by=["Date", "ticker"], inplace=True)
 
     # Kaydet
-    if not os.path.exists(os.path.dirname(out_path)):
-        os.makedirs(os.path.dirname(out_path))
+    out_dir = os.path.dirname(out_path)
+    if out_dir and not os.path.exists(out_dir):
+        os.makedirs(out_dir, exist_ok=True)
 
     final_df.to_csv(out_path, index=False)
     print(f"\n🎉 Veri seti oluşturuldu: {out_path}")
@@ -74,6 +187,11 @@ if __name__ == "__main__":
         action="store_true",
         help="Endeks ve kur verilerini indirme",
     )
+    parser.add_argument(
+        "--incremental",
+        action="store_true",
+        help="Mevcut veri setini sadece eksik günlerle güncelle",
+    )
     args = parser.parse_args()
 
     end_d = args.end_date
@@ -85,4 +203,5 @@ if __name__ == "__main__":
         end_date=end_d,
         output_path=args.output_path,
         include_macro=not args.no_macro,
+        incremental=args.incremental,
     )
