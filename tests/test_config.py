@@ -69,3 +69,15 @@ def test_add_features_produces_all_config_features():
     processed = features.add_features(raw, drop_incomplete_target=False)
     for col in config.FEATURES:
         assert col in processed.columns
+
+
+def test_small_dataset_isolates_both_config_namespaces(small_dataset, tmp_path):
+    import config as direct_config
+    from src import config as src_config
+
+    assert direct_config.DATA_PATH == src_config.DATA_PATH
+    assert direct_config.MODEL_PATH == src_config.MODEL_PATH
+    assert direct_config.MODEL_META_PATH == src_config.MODEL_META_PATH
+    assert str(tmp_path) in direct_config.DATA_PATH
+    assert str(tmp_path) in direct_config.MODEL_PATH
+    assert str(tmp_path) in direct_config.MODEL_META_PATH
