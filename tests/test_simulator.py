@@ -100,4 +100,3 @@ def test_simulate_investment_validation_errors(sample_price_frame):
 
     # Boş DataFrame
     assert simulator.simulate_investment(pd.DataFrame(), []) is None
-

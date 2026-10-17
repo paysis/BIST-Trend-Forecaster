@@ -181,4 +181,3 @@ def simulate_investment(
         max_drawdown_pct=round(max_dd_pct, 2),
         daily_timeline=timeline_df,
     )
-
