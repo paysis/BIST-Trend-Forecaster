@@ -53,6 +53,7 @@ def no_retry_delay(monkeypatch):
 def small_dataset(tmp_path, monkeypatch):
     """Gerçek CSV'den 3 hisse x ~1 yıllık küçük bir kesit; config yolları tmp'ye yönlendirilir."""
     import config
+    from src import config as src_config
 
     if not os.path.exists(config.DATA_PATH):
         pytest.skip("veri seti yok")
@@ -65,7 +66,14 @@ def small_dataset(tmp_path, monkeypatch):
     ]
     data_path = tmp_path / "data.csv"
     df.to_csv(data_path, index=False)
-    monkeypatch.setattr(config, "DATA_PATH", str(data_path))
-    monkeypatch.setattr(config, "MODEL_PATH", str(tmp_path / "models" / "model.json"))
-    monkeypatch.setattr(config, "MODEL_META_PATH", str(tmp_path / "models" / "model_meta.json"))
+
+    models_dir = tmp_path / "models"
+    models_dir.mkdir(parents=True, exist_ok=True)
+    model_path = str(models_dir / "model.json")
+    model_meta_path = str(models_dir / "model_meta.json")
+
+    for cfg in (config, src_config):
+        monkeypatch.setattr(cfg, "DATA_PATH", str(data_path))
+        monkeypatch.setattr(cfg, "MODEL_PATH", model_path)
+        monkeypatch.setattr(cfg, "MODEL_META_PATH", model_meta_path)
     return df
