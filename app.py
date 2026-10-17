@@ -9,6 +9,7 @@ import xgboost as xgb
 from src import (
     backtest,
     config,
+    drift,
     explain,
     live_data,
     model_metadata,
@@ -68,7 +69,7 @@ commission_rate = st.sidebar.slider(
 )
 cost = commission_rate / 100.0
 
-# Model Bilgisi (#13)
+# Model Bilgisi (#13, #45)
 model_meta = model_metadata.load_metadata(config.MODEL_META_PATH)
 with st.sidebar.expander("ℹ️ Model Bilgisi", expanded=False):
     if model_meta:
@@ -79,6 +80,7 @@ with st.sidebar.expander("ℹ️ Model Bilgisi", expanded=False):
         if "metrics" in model_meta and "roc_auc" in model_meta["metrics"]:
             st.write(f"**ROC-AUC:** {model_meta['metrics']['roc_auc']:.3f}")
         st.write(f"**Öznitelik Sayısı:** {len(model_meta.get('features', []))}")
+        st.write("**Veri Sağlığı (PSI):** 🟢 Aktif İzleme")
     else:
         st.write("Model meta-verisi bulunamadı.")
 
@@ -239,6 +241,7 @@ def render_single_ticker_tab():
         st.dataframe(input_data[["rsi", "macd", "sma_10", "sma_50", "volatility"]])
 
         render_backtest(model, df_processed[["Date", "close"] + config.FEATURES], cost=cost)
+        render_drift_section(df_processed[config.FEATURES])
 
 
 BACKTEST_MONTHS = 6
@@ -303,6 +306,24 @@ def render_backtest(model, df_processed, cost=0.0):
         f"{cost_text}"
         "Geçmiş performans gelecekteki sonuçları garanti etmez."
     )
+
+
+def render_drift_section(df_features):
+    """Öznitelik sapmasını (Data Drift / PSI) hesaplayıp özetler (#45)."""
+    with st.expander("📊 Veri & Öznitelik Sapması (Data Drift / PSI)", expanded=False):
+        drift_df, summary = drift.compute_series_drift_by_split(df_features, recent_rows=60)
+        st.markdown(
+            f"**Genel Sağlık Durumu:** {summary['badge']} | "
+            f"**Ortalama PSI:** `{summary['mean_psi']:.4f}` | "
+            f"**Maksimum PSI:** `{summary['max_psi']:.4f}`"
+        )
+        st.caption(
+            "Population Stability Index (PSI), geçmiş referans dönem ile son 60 günün "
+            "teknik gösterge dağılımlarını kıyaslar. "
+            "PSI < 0.10: Sağlıklı, 0.10-0.25: Hafif Sapma, > 0.25: Kritik Sapma."
+        )
+        if not drift_df.empty:
+            st.dataframe(drift_df[["Öznitelik", "Rozet", "PSI", "Öneri"]])
 
 
 # Tarama tablolarında sayıların tutarlı ondalıkla gösterimi (örn. 1.9 yerine 1.90)

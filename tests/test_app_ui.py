@@ -579,3 +579,20 @@ def test_app_renders_macro_indicators_expander(monkeypatch):
     assert list(at.exception) == []
     expander_labels = [e.label for e in at.expander]
     assert any("Makro Piyasa Göstergeleri" in label for label in expander_labels)
+
+
+def test_app_renders_data_drift_expander(patched_download):
+    """Tekli hisse sekmesinde veri sapması (Drift/PSI) expander'ı ve tablosu render edilmeli."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert list(at.exception) == []
+    expander_labels = [e.label for e in at.expander]
+    assert any("Veri & Öznitelik Sapması" in label for label in expander_labels)
+    drift_tables = [
+        df.value
+        for df in at.dataframe
+        if "Öznitelik" in df.value.columns and "PSI" in df.value.columns
+    ]
+    assert len(drift_tables) == 1
+    assert "PSI" in drift_tables[0].columns
+    assert "Rozet" in drift_tables[0].columns
