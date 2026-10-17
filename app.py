@@ -331,9 +331,7 @@ def render_market_scanner_tab():
             )
 
             filtered_scan_df = (
-                scan_df[scan_df["Sektör"].isin(selected_sectors)]
-                if selected_sectors
-                else scan_df
+                scan_df[scan_df["Sektör"].isin(selected_sectors)] if selected_sectors else scan_df
             )
 
             top_bull, top_bear = scanner.top_and_bottom(filtered_scan_df, n=5)
