@@ -554,4 +554,3 @@ def test_app_renders_data_drift_expander(patched_download):
     assert len(drift_tables) == 1
     assert "PSI" in drift_tables[0].columns
     assert "Rozet" in drift_tables[0].columns
-
