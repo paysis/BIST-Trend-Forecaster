@@ -596,3 +596,12 @@ def test_app_renders_data_drift_expander(patched_download):
     assert len(drift_tables) == 1
     assert "PSI" in drift_tables[0].columns
     assert "Rozet" in drift_tables[0].columns
+
+
+def test_app_title_renders_correctly(patched_download):
+    """Ana başlığın beklenen metinle render edildiğini doğrular."""
+    at = AppTest.from_file(APP_PATH, default_timeout=30)
+    at.run()
+    assert list(at.exception) == []
+    assert len(at.title) >= 1
+    assert "Borsa İstanbul Yapay Zeka Yön Tahmini" in at.title[0].value

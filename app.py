@@ -21,7 +21,7 @@ from src import (
 # Sayfa Ayarları
 st.set_page_config(page_title="BIST Hisse Yön Tahmini", layout="wide")
 
-st.title("📈 Borsa İstanbul Yapay Zeka Yön Tahmini")
+st.title("📈 Borsa İstanbul Yapay Zeka Yön Tahmini", anchor=False)
 st.markdown("""
 Bu proje **XGBoost** algoritması kullanarak BIST 30 hisselerinin
 bir sonraki günkü kapanış yönünü (Artış/Düşüş) tahmin eder.
@@ -186,7 +186,7 @@ def render_single_ticker_tab():
                 m3.write(f"**💵 USD/TRY Değişimi:** %{fx_pct:+.2f}")
 
         # GRAFİK KISMI (Candlestick)
-        st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği")
+        st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği", anchor=False)
         fig = go.Figure(
             data=[
                 go.Candlestick(
@@ -203,7 +203,7 @@ def render_single_ticker_tab():
 
         # Explainability (PDF Şartı: Neden bu karar?)
         # Modelin gerçek TreeSHAP katkıları: her özniteliğin bu tahmindeki payı
-        st.subheader("Model Neden Bu Kararı Verdi?")
+        st.subheader("Model Neden Bu Kararı Verdi?", anchor=False)
         explanation, base_prob = explain.explain_prediction(model, X_pred)
         st.markdown(explain.summarize_drivers(explanation, selected_ticker))
 
@@ -249,7 +249,10 @@ BACKTEST_MONTHS = 6
 
 def render_backtest(model, df_processed, cost=0.0):
     """Modelin yükseliş sinyallerini izleyen al/nakit stratejisini al-tut ile kıyaslar."""
-    st.subheader(f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)")
+    st.subheader(
+        f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)",
+        anchor=False,
+    )
     window = backtest.recent_window(df_processed, months=BACKTEST_MONTHS)
     probs = model.predict_proba(window.drop(columns=["Date", "close"]))[:, 1]
     result = backtest.run_backtest(window, probs, threshold=prob_high, cost=cost)
@@ -336,7 +339,7 @@ SCAN_COLUMN_CONFIG = {
 
 
 def render_market_scanner_tab():
-    st.subheader("📊 BIST 30 Piyasa Fırsat Radarı")
+    st.subheader("📊 BIST 30 Piyasa Fırsat Radarı", anchor=False)
     st.markdown("""
     Bu modül BIST 30 endeksindeki tüm hisseleri yapay zeka modelinden geçirerek
     yarın için en yüksek yükseliş potansiyeline ve düşüş riskine sahip hisseleri sıralar.
