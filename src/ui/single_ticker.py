@@ -12,7 +12,7 @@ BACKTEST_MONTHS = 6
 
 def render_backtest(model, df_processed, threshold=config.PROB_THRESHOLD_HIGH, cost=0.0):
     """Modelin yükseliş sinyallerini izleyen al/nakit stratejisini al-tut ile kıyaslar."""
-    st.subheader(f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)")
+    st.subheader(f"Geçmiş Strateji Getirisi (Backtest, Son {BACKTEST_MONTHS} Ay)", anchor=False)
     window = backtest.recent_window(df_processed, months=BACKTEST_MONTHS)
     probs = model.predict_proba(window.drop(columns=["Date", "close"]))[:, 1]
     result = backtest.run_backtest(window, probs, threshold=threshold, cost=cost)
@@ -166,7 +166,7 @@ def render_single_ticker_tab(
                 m3.write(f"**💵 USD/TRY Değişimi:** %{fx_pct:+.2f}")
 
         # GRAFİK KISMI (Candlestick)
-        st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği")
+        st.subheader(f"{selected_ticker} - Son 3 Ay Fiyat Grafiği", anchor=False)
         fig = go.Figure(
             data=[
                 go.Candlestick(
@@ -182,7 +182,7 @@ def render_single_ticker_tab(
         st.plotly_chart(fig, width="stretch")
 
         # Explainability (TreeSHAP)
-        st.subheader("Model Neden Bu Kararı Verdi?")
+        st.subheader("Model Neden Bu Kararı Verdi?", anchor=False)
         explanation, base_prob = explain.explain_prediction(model, X_pred)
         st.markdown(explain.summarize_drivers(explanation, selected_ticker))
 

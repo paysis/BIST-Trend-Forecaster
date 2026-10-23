@@ -26,7 +26,7 @@ __all__ = [
 # Sayfa Ayarları
 st.set_page_config(page_title="BIST Hisse Yön Tahmini", layout="wide")
 
-st.title("📈 Borsa İstanbul Yapay Zeka Yön Tahmini")
+st.title("📈 Borsa İstanbul Yapay Zeka Yön Tahmini", anchor=False)
 st.markdown("""
 Bu proje **XGBoost** algoritması kullanarak BIST 30 hisselerinin
 bir sonraki günkü kapanış yönünü (Artış/Düşüş) tahmin eder.

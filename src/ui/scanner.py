@@ -8,7 +8,7 @@ from src.ui.components import SCAN_COLUMN_CONFIG, get_cached_market_scan
 
 def render_market_scanner_tab():
     """BIST 30 piyasa tarama sekmesini ve liderlik tablolarını render eder."""
-    st.subheader("📊 BIST 30 Piyasa Fırsat Radarı")
+    st.subheader("📊 BIST 30 Piyasa Fırsat Radarı", anchor=False)
     st.markdown("""
     Bu modül BIST 30 endeksindeki tüm hisseleri yapay zeka modelinden geçirerek
     yarın için en yüksek yükseliş potansiyeline ve düşüş riskine sahip hisseleri sıralar.
